@@ -1,0 +1,256 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>AniAsk - AI Anime Assistant</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-high": "#1f2a3c",
+                        "on-error": "#690005",
+                        "secondary-container": "#0566d9",
+                        "error": "#ffb4ab",
+                        "on-primary-container": "#340080",
+                        "on-background": "#d8e3fb",
+                        "tertiary-fixed": "#dae2fd",
+                        "surface-container-lowest": "#040e1f",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-secondary": "#002e6a",
+                        "surface": "#081425",
+                        "tertiary": "#bec6e0",
+                        "tertiary-container": "#8990a8",
+                        "error-container": "#93000a",
+                        "primary": "#d0bcff",
+                        "primary-fixed": "#e9ddff",
+                        "tertiary-fixed-dim": "#bec6e0",
+                        "on-tertiary": "#283044",
+                        "inverse-primary": "#6d3bd7",
+                        "surface-container-low": "#111c2d",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-secondary-fixed-variant": "#004395",
+                        "on-tertiary-fixed-variant": "#3f465c",
+                        "inverse-surface": "#d8e3fb",
+                        "surface-container": "#152031",
+                        "on-tertiary-container": "#22293d",
+                        "on-primary": "#3c0091",
+                        "surface-tint": "#d0bcff",
+                        "on-secondary-fixed": "#001a42",
+                        "primary-container": "#a078ff",
+                        "surface-dim": "#081425",
+                        "on-tertiary-fixed": "#131b2e",
+                        "inverse-on-surface": "#263143",
+                        "surface-bright": "#2f3a4c",
+                        "on-error-container": "#ffdad6",
+                        "secondary": "#adc6ff",
+                        "surface-container-highest": "#2a3548",
+                        "surface-variant": "#2a3548",
+                        "on-secondary-container": "#e6ecff",
+                        "outline": "#958ea0",
+                        "primary-fixed-dim": "#d0bcff",
+                        "outline-variant": "#494454",
+                        "on-surface": "#d8e3fb",
+                        "on-primary-fixed": "#23005c",
+                        "on-surface-variant": "#cbc3d7",
+                        "on-primary-fixed-variant": "#5516be",
+                        "background": "#081425"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "container-padding": "24px",
+                        "chat-max-width": "800px",
+                        "sidebar-width": "280px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Geist"],
+                        "code": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "display": ["Geist"],
+                        "body-md": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "label-md": ["Geist"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "code": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "display": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "800" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .halftone-bg {
+            background-image: radial-gradient(circle at center, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 8px 8px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-screen flex overflow-hidden">
+<!-- TopNavBar (Mobile only) -->
+<header class="md:hidden flex justify-between items-center px-gutter h-16 z-40 bg-surface/80 dark:bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 fixed top-0 w-full transition-all duration-300">
+<div class="font-display text-headline-lg-mobile font-extrabold text-on-surface dark:text-on-surface">AniAsk</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</header>
+<!-- SideNavBar (Desktop) -->
+<nav class="hidden md:flex flex-col h-screen w-sidebar-width fixed left-0 top-0 bg-surface-container-low dark:bg-surface-container-low border-r border-outline-variant dark:border-outline-variant font-body-md text-body-md z-30 flex flex-col h-full p-4">
+<!-- Brand -->
+<div class="px-4 py-6 mb-4"><div class="flex items-center gap-3">
+  <img alt="AniAsk Logo" class="w-12 h-12 rounded-lg object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeST8pRuivjnoO9Q6Cz_FpSNPV1fzV-qKHAqtivUMybjQ_KnMRaVskoBRFvpGOJ748Xm1AJXnhRCBp8JXdPRLaPfD4tUzAQNEgxXUPJBayGqiIVTDhbB724Zq3qrVxi6NUEmyi4twjpSgqZwfOKEthBrsL1UbINou6XZPWNff_F1m5v7AIN7Xp889a32lSbso1syFvsHl6j91UfNQE8bBfi5WXwA93JfS3BEuer8_crUR7rIX0nCybwh69n8vNfNm2vJfRNCgUQ7tI">
+  <div class="flex flex-col">
+    <h1 class="font-display text-headline-md font-extrabold text-on-surface dark:text-on-surface tracking-tight leading-none">AniAsk</h1>
+    <p class="text-label-md font-label-md text-on-surface-variant mt-1">AI Anime Assistant</p>
+  </div>
+</div></div>
+<!-- Main CTA -->
+<button class="flex items-center gap-3 bg-primary text-on-primary rounded-xl px-4 py-3 border-l-4 border-on-primary-container font-label-md text-label-md active:scale-95 transition-transform mb-4">
+<span class="material-symbols-outlined">add_circle</span>
+            New Chat
+        </button>
+<!-- Navigation Links -->
+<div class="flex-1 overflow-y-auto space-y-1"><p class="px-4 py-2 text-label-md font-label-md text-on-surface-variant uppercase tracking-wider mb-2">Recent</p><div class="px-4 mb-4"><div class="relative bg-surface-container-highest rounded-xl border border-outline-variant focus-within:border-primary flex items-center px-3 py-2"><span class="material-symbols-outlined text-on-surface-variant text-body-md mr-2">search</span><input class="bg-transparent border-none focus:ring-0 text-body-md w-full p-0 placeholder-on-surface-variant/50" placeholder="Search recent..." type="text"></div></div><a class="block px-4 py-2 text-body-md font-body-md text-on-surface-variant truncate hover:text-primary transition-colors" href="#">Steins;Gate Cast</a><a class="block px-4 py-2 text-body-md font-body-md text-on-surface-variant truncate hover:text-primary transition-colors" href="#">Highest Rated 2024</a><a class="block px-4 py-2 text-body-md font-body-md text-on-surface-variant truncate hover:text-primary transition-colors" href="#">Shonen Recommendations</a></div>
+<!-- Footer Links -->
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-[280px] flex flex-col h-screen relative pt-16 md:pt-0">
+<!-- Top App Bar (Desktop Context - Hidden as requested in prompt, focusing on welcome state) -->
+<!-- Scrollable Chat/Welcome Canvas -->
+<div class="flex-1 overflow-y-auto w-full flex flex-col items-center justify-center p-4 md:p-8 pb-[140px] relative z-10">
+<!-- Animated Background Detail -->
+<div class="absolute inset-0 z-[-1] opacity-20 pointer-events-none">
+<div class="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl"></div>
+<div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl"></div>
+</div>
+<!-- Welcome State Content -->
+<div class="w-full max-w-chat-max-width flex flex-col items-center text-center space-y-8 animate-fade-in-up">
+<!-- Hero Section -->
+<div class="space-y-4">
+<h2 class="font-display text-display font-extrabold text-on-surface tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">AniAsk</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mx-auto whitespace-nowrap">Ask anything about anime ratings, cast, studios and more!</p>
+</div>
+<!-- Bento Grid for Prompts -->
+</div>
+</div>
+<!-- Fixed Bottom Input Area -->
+<div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-background via-background/90 to-transparent pt-12 pb-6 px-4 md:px-8 z-20">
+<div class="max-w-chat-max-width mx-auto relative">
+<!-- Loading Indicator (Hidden by default, styled for context) -->
+<div class="absolute -top-8 left-4 flex items-center gap-2 opacity-0 transition-opacity duration-300 pointer-events-none" id="loading-indicator">
+<div class="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
+<span class="font-label-md text-label-md text-primary animate-pulse">Searching AniList...</span>
+</div>
+<!-- Input Field Container -->
+<div class="relative bg-surface-container-highest rounded-full border border-outline-variant focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 shadow-lg transition-all duration-300 flex items-center overflow-hidden">
+<div class="absolute inset-0 halftone-bg opacity-20 pointer-events-none"></div>
+<input class="w-full bg-transparent border-none focus:ring-0 text-on-surface font-body-md text-body-md placeholder-on-surface-variant/50 py-4 relative z-10 outline-none px-6" placeholder="Ask about any anime or manga..." type="text">
+<button class="p-3 mr-2 bg-primary text-on-primary rounded-full hover:bg-primary-container transition-colors relative z-10 flex-shrink-0 active:scale-95 m-1 flex items-center justify-center w-10 h-10">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+<p class="text-center font-label-md text-label-md text-on-surface-variant/50 mt-3 hidden md:block">AniAsk can make mistakes. Verify important info.</p>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container-highest dark:bg-surface-container-highest border-t border-outline-variant shadow-lg flex justify-around items-center h-16 px-2 pb-safe z-50 font-label-md text-label-md">
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">chat</span>
+<span class="text-[10px] mt-1">Chat</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-variant rounded-full px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">search</span>
+<span class="text-[10px] mt-1">Search</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-variant rounded-full px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">bookmark</span>
+<span class="text-[10px] mt-1">Saved</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-variant rounded-full px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] mt-1">Profile</span>
+</a>
+</nav>
+<style>
+        /* Custom Keyframes for subtle animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fade-in-up {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        
+        /* Safe area support for iOS */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .pb-safe {
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+        }
+    </style>
+<script>
+        // Simple interaction script to demonstrate loading state on input focus
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputField = document.querySelector('input[type="text"]');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const sendBtn = document.querySelector('button .material-symbols-outlined[data-weight="fill"]').parentElement;
+
+            if(inputField && loadingIndicator && sendBtn) {
+                // Simulate typing delay for loading indicator
+                let typingTimer;
+                const doneTypingInterval = 1000;
+
+                inputField.addEventListener('keyup', () => {
+                    clearTimeout(typingTimer);
+                    if (inputField.value) {
+                        typingTimer = setTimeout(() => {
+                           loadingIndicator.classList.remove('opacity-0');
+                           setTimeout(() => loadingIndicator.classList.add('opacity-0'), 2000); // hide after 2s for demo
+                        }, doneTypingInterval);
+                    }
+                });
+
+                inputField.addEventListener('keydown', () => {
+                    clearTimeout(typingTimer);
+                    loadingIndicator.classList.add('opacity-0');
+                });
+                
+                // Add a simple click effect to cards
+                const cards = document.querySelectorAll('.grid > button');
+                cards.forEach(card => {
+                    card.addEventListener('click', () => {
+                        inputField.value = card.querySelector('span.text-body-md').innerText;
+                        inputField.focus();
+                    });
+                });
+            }
+        });
+    </script>
+
+
+</body></html>

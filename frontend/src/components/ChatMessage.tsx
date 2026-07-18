@@ -11,7 +11,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
     <div className={`chat-message ${isUser ? "chat-message-user" : "chat-message-assistant"}`}>
       {!isUser && (
         <div className="chat-avatar">
-          <span className="material-symbols-outlined">smart_toy</span>
+          <img src="/speaking.png" alt="AniAsk" className="chat-avatar-img" />
         </div>
       )}
       <div className={`chat-bubble ${isUser ? "chat-bubble-user" : "chat-bubble-assistant"}`}>
@@ -56,7 +56,7 @@ function formatMessageContent(content: string): string {
     )
     // Bare URLs (skip ones already inside href="...")
     .replace(
-      /(?<!["=(])(https?:\/\/[^\s<)]+)/g,
+      /(?<!["=])(https?:\/\/[^\s<)]+)/g,
       '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
     )
     // Bullet lists: lines starting with - or •

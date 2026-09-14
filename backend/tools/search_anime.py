@@ -189,6 +189,8 @@ def search_anime(
         studio_names = [s["name"] for s in anime.get("studios", {}).get("nodes", [])]
         studio = studio_names[0] if studio_names else "Unknown studio"
 
+        cover = anime.get("coverImage", {}).get("large", "")
+
         entry = (
             f"• {title}\n"
             f"  ID: {anime['id']} | Score: {anime.get('averageScore', 'N/A')}/100 | "
@@ -197,6 +199,7 @@ def search_anime(
             f"Season: {anime.get('season', '?')} {anime.get('seasonYear', '?')}\n"
             f"  Genres: {', '.join(anime.get('genres', []))}\n"
             f"  Studio: {studio}\n"
+            f"  Cover: {cover}\n"
             f"  URL: {anime.get('siteUrl', 'N/A')}"
         )
         results.append(entry)

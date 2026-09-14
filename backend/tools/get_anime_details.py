@@ -84,6 +84,9 @@ query GetAnimeDetails($id: Int!) {
                     name {
                         full
                     }
+                    image {
+                        large
+                    }
                 }
                 voiceActors(language: JAPANESE) {
                     name {
@@ -152,10 +155,12 @@ def _format_characters(char_edges: list[dict]) -> str:
     lines = []
     for edge in char_edges:
         char_name = edge.get("node", {}).get("name", {}).get("full", "Unknown")
+        char_image = edge.get("node", {}).get("image", {}).get("large", "")
         role = edge.get("role", "UNKNOWN")
         va_list = edge.get("voiceActors", [])
         va_name = va_list[0]["name"]["full"] if va_list else "N/A"
-        lines.append(f"  • {char_name} ({role}) — VA: {va_name}")
+        img_tag = f" [Image: {char_image}]" if char_image else ""
+        lines.append(f"  • {char_name} ({role}) — VA: {va_name}{img_tag}")
     return "\n".join(lines)
 
 
@@ -224,7 +229,11 @@ def get_anime_details(anime_id: int) -> str:
     tags = anime.get("tags", [])
     top_tags = [t["name"] for t in tags if t.get("rank", 0) >= 60]
 
+    cover_image = anime.get("coverImage", {}).get("large", "")
+    cover_line = f"Cover Image: {cover_image}" if cover_image else ""
+
     result = f"""── {title} ──
+{cover_line}
 Title (Romaji): {anime['title'].get('romaji', 'N/A')}
 Title (Native): {anime['title'].get('native', 'N/A')}
 

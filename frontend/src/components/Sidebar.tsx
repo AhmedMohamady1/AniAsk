@@ -58,17 +58,32 @@ export default function Sidebar({
     [conversations, onSearch]
   );
 
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    };
+  }, []);
+
   const handleDelete = useCallback(
     (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
+      e.preventDefault();
+
       if (deletingId === id) {
         // Second click = confirm
-        onDeleteConversation(id);
+        if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+        deleteTimerRef.current = null;
         setDeletingId(null);
+        onDeleteConversation(id);
       } else {
+        // First click = enter confirm state
+        if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
         setDeletingId(id);
-        // Reset confirmation after 3 seconds
-        setTimeout(() => setDeletingId(null), 3000);
+        deleteTimerRef.current = setTimeout(() => {
+          setDeletingId(null);
+        }, 3000);
       }
     },
     [deletingId, onDeleteConversation]
@@ -123,14 +138,21 @@ export default function Sidebar({
         ) : (
           <div className="conversation-list">
             {filteredConversations.map((conv) => (
-              <button
+              <div
                 key={conv.id}
+                role="button"
+                tabIndex={0}
                 className={`conversation-item ${
                   conv.id === activeConversationId
                     ? "conversation-item--active"
                     : ""
                 }`}
                 onClick={() => onSelectConversation(conv.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    onSelectConversation(conv.id);
+                  }
+                }}
               >
                 <div className="conversation-item-content">
                   <span className="conversation-item-title">{conv.title}</span>
@@ -139,17 +161,20 @@ export default function Sidebar({
                   </span>
                 </div>
                 <button
+                  type="button"
                   className={`conversation-delete-btn ${
                     deletingId === conv.id ? "conversation-delete-btn--confirm" : ""
                   }`}
+                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => handleDelete(e, conv.id)}
                   title={deletingId === conv.id ? "Click again to confirm" : "Delete"}
+                  aria-label={deletingId === conv.id ? "Confirm delete" : "Delete"}
                 >
                   <span className="material-symbols-outlined">
                     {deletingId === conv.id ? "check" : "delete"}
                   </span>
                 </button>
-              </button>
+              </div>
             ))}
           </div>
         )}

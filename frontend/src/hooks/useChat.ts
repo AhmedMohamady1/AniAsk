@@ -12,9 +12,11 @@ import type { ChatMessage, MessageEntry } from "../types";
 /** Max number of history messages to send to the backend. */
 const MAX_HISTORY_MESSAGES = 20;
 
-/** Generate a simple unique ID for messages. */
+let idCounter = 0;
+
+/** Generate a simple unique ID for messages, monotonically ordered. */
 function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return `${Date.now()}-${String(++idCounter).padStart(4, "0")}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 interface UseChatOptions {
@@ -82,6 +84,7 @@ export function useChat({
         ...assistantPlaceholder,
         content: response.reply,
         isLoading: false,
+        timestamp: new Date(),
       };
 
       // 3. Replace the placeholder with the real response
@@ -108,6 +111,7 @@ export function useChat({
         ...assistantPlaceholder,
         content: `⚠️ Error: ${errorText}`,
         isLoading: false,
+        timestamp: new Date(),
       };
 
       setMessages((prev) =>

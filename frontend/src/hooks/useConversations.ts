@@ -78,8 +78,20 @@ export function useConversations() {
         .equals(id)
         .toArray();
 
-      // Sort by timestamp ascending
-      stored.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      // Sort by timestamp ascending.
+      // For messages with identical timestamps (common in older stored data where user
+      // and assistant messages were created in the same millisecond), ensure the user
+      // message always precedes the assistant response.
+      stored.sort((a, b) => {
+        const timeA = new Date(a.timestamp).getTime();
+        const timeB = new Date(b.timestamp).getTime();
+        const timeDiff = timeA - timeB;
+        if (timeDiff !== 0) return timeDiff;
+        if (a.role !== b.role) {
+          return a.role === "user" ? -1 : 1;
+        }
+        return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      });
 
       return stored.map((m) => ({
         id: m.id,

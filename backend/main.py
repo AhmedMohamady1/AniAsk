@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routers.chat import router as chat_router
+from backend.routers.summarize import router as summarize_router
 
 # Configure logging
 logging.basicConfig(
@@ -68,3 +69,4 @@ app.add_middleware(
 
 # ── Routes ────────────────────────────────────────────────────────────
 app.include_router(chat_router)
+app.include_router(summarize_router)

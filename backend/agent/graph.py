@@ -120,15 +120,30 @@ def _extract_text(content) -> str:
     return str(content)
 
 
-async def run_agent(user_message: str) -> str:
-    """Run the AniAsk agent with a user message and return the final response."""
-    from langchain_core.messages import HumanMessage
+async def run_agent(user_message: str, history: list[dict] | None = None) -> str:
+    """Run the AniAsk agent with a user message and return the final response.
+
+    Args:
+        user_message: The current user message.
+        history: Optional list of previous messages as dicts with 'role' and
+                 'content' keys.  These are prepended to give the agent
+                 conversational context.
+    """
+    from langchain_core.messages import AIMessage, HumanMessage
 
     graph = get_graph()
 
-    result = await graph.ainvoke(
-        {"messages": [HumanMessage(content=user_message)]}
-    )
+    # Build the message list: history first, then the current message.
+    messages: list = []
+    if history:
+        for entry in history:
+            if entry["role"] == "user":
+                messages.append(HumanMessage(content=entry["content"]))
+            else:
+                messages.append(AIMessage(content=entry["content"]))
+    messages.append(HumanMessage(content=user_message))
+
+    result = await graph.ainvoke({"messages": messages})
 
     final_message = result["messages"][-1]
     return _extract_text(final_message.content)

@@ -33,7 +33,11 @@ async def chat(request: ChatRequest):
     logger.info("Chat request: %s", request.message[:100])
 
     try:
-        reply = await run_agent(request.message)
+        history = [
+            {"role": entry.role, "content": entry.content}
+            for entry in request.history
+        ]
+        reply = await run_agent(request.message, history=history)
         return ChatResponse(reply=reply)
     except Exception as e:
         logger.exception("Agent error for message: %s", request.message[:100])

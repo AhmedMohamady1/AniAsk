@@ -8,42 +8,114 @@ Most API wrappers require you to know the exact endpoint/schema to get an answer
 
 ## Tech stack
 
-- **LangChain** (or LangGraph) — agent orchestration and tool-calling loop
+- **LangChain / LangGraph** — agent orchestration and tool-calling loop
+- **Google Gemini** — LLM powering the agent
 - **AniList GraphQL API** — public, no auth required for anime/manga search data
-- **FastAPI** — backend serving the agent
-- **[frontend TBD]** — chat interface
-
-## Planned features
-
-- [ ] Natural language → AniList GraphQL query agent (core MVP)
-- [ ] Chat interface for asking questions
-- [ ] Personal AniList profile analysis (e.g. "analyze my list" — genre breakdown, completion stats, watch trends) — planned as a v2 feature, will require AniList OAuth2 to read a user's list
+- **FastAPI + Uvicorn** — backend API server
+- **React + TypeScript + Vite** — frontend chat interface
 
 ## Project structure
 
 ```
 AniAsk/
-├── agent/       # agent orchestration (LangChain/LangGraph agent setup)
-├── tools/       # AniList GraphQL query tools the agent can call
-├── tests/       # test query set + evaluation notes
-├── frontend/    # chat UI
-├── .env.example # required environment variables (copy to .env)
-└── requirements.txt
+├── backend/
+│   ├── agent/          # LangGraph agent (graph, prompts, state)
+│   ├── tools/          # AniList GraphQL query tools (search, details)
+│   ├── routers/        # FastAPI route handlers (/api/chat, /api/health)
+│   ├── schemas/        # Pydantic request/response models
+│   ├── config.py       # Settings loaded from .env
+│   └── main.py         # FastAPI app entry point
+├── frontend/
+│   └── src/            # React + TypeScript chat UI
+├── tests/              # pytest tests + evaluation query set
+├── .env.example        # required environment variables (copy to .env)
+└── requirements.txt    # Python dependencies
 ```
+
+## Prerequisites
+
+- **Python 3.10+**
+- **Node.js 18+** and **npm**
+- A **Google AI (Gemini) API key** — get one at [aistudio.google.com](https://aistudio.google.com)
 
 ## Setup
 
+### 1. Clone the repo
+
 ```bash
-python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-pip install -r requirements.txt
-cp .env.example .env  # then fill in your LLM API key
+git clone https://github.com/AhmedMohamady/AniAsk.git
+cd AniAsk
 ```
 
-## Status
+### 2. Configure environment variables
 
-🚧 Early development — core agent + tools in progress.
+```bash
+cp .env.example .env
+```
 
-## Example queries (evaluation set)
+Open `.env` and set your API key:
 
-See [`tests/test_queries.md`](tests/test_queries.md) for the full list of natural language queries used to test the agent, spanning easy → hard cases.
+| Variable | Required | Description |
+|---|---|---|
+| `GOOGLE_API_KEY` | ✅ | Your Google AI (Gemini) API key |
+| `ANILIST_API_URL` | ❌ | AniList GraphQL endpoint (defaults to `https://graphql.anilist.co`) |
+
+### 3. Install backend dependencies
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 4. Install frontend dependencies
+
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+## Running the project
+
+You need **two terminals** — one for the backend and one for the frontend.
+
+### Terminal 1 — Backend (FastAPI)
+
+From the project root:
+
+```bash
+source .venv/bin/activate
+uvicorn backend.main:app --reload
+```
+
+The API server will start at **http://localhost:8000**.
+- API docs (Swagger): http://localhost:8000/docs
+- Health check: http://localhost:8000/api/health
+
+### Terminal 2 — Frontend (Vite + React)
+
+From the project root:
+
+```bash
+cd frontend
+npm run dev
+```
+
+The frontend dev server will start at **http://localhost:5173**. Open that URL in your browser to start chatting.
+
+## Running tests
+
+```bash
+source .venv/bin/activate
+pytest
+```
+
+## Example queries
+
+See [`tests/test_queries.md`](tests/test_queries.md) for the full evaluation set. Some examples:
+
+- *"What's the highest rated anime this season?"*
+- *"Who are the main voice actors in Steins;Gate?"*
+- *"Tell me about Attack on Titan"*
+- *"What anime are trending right now?"*

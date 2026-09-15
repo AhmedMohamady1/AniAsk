@@ -244,6 +244,138 @@ a:hover {
   opacity: 0.5;
 }
 
+/* ── Sidebar Search ────────────────────────────────────────────── */
+
+.sidebar-search {
+  position: relative;
+  padding: 0 var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.sidebar-search-icon {
+  position: absolute;
+  left: calc(var(--space-3) + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.15rem;
+  color: var(--color-text-dim);
+  pointer-events: none;
+}
+
+.sidebar-search-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-2) var(--space-2) 36px;
+  background: var(--color-elevated);
+  border: 1px solid var(--color-elevated-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.sidebar-search-input::placeholder {
+  color: var(--color-text-dim);
+}
+
+.sidebar-search-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px hsla(var(--accent-hue), 70%, 55%, 0.15);
+}
+
+/* ── Conversation List ─────────────────────────────────────────── */
+
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 var(--space-2);
+}
+
+.conversation-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.conversation-item:hover {
+  background: var(--color-elevated);
+  color: var(--color-text-primary);
+}
+
+.conversation-item--active {
+  background: var(--color-elevated);
+  color: var(--color-text-primary);
+  border-left: 2px solid var(--color-accent);
+}
+
+.conversation-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conversation-item-title {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-item-time {
+  font-size: 0.7rem;
+  color: var(--color-text-dim);
+}
+
+.conversation-delete-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-dim);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.conversation-item:hover .conversation-delete-btn {
+  display: flex;
+}
+
+.conversation-delete-btn:hover {
+  color: hsl(0, 70%, 60%);
+  background: hsla(0, 70%, 60%, 0.1);
+}
+
+.conversation-delete-btn .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.conversation-delete-btn--confirm {
+  display: flex;
+  color: hsl(0, 70%, 60%);
+  background: hsla(0, 70%, 60%, 0.15);
+}
+
 
 /* ══════════════════════════════════════════════════════════════════
    5. WELCOME SCREEN

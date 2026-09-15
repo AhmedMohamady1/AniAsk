@@ -74,6 +74,10 @@ query GetAnimeDetails($id: Int!) {
                     name {
                         full
                     }
+                    image {
+                        large
+                    }
+                    siteUrl
                 }
             }
         }
@@ -87,11 +91,16 @@ query GetAnimeDetails($id: Int!) {
                     image {
                         large
                     }
+                    siteUrl
                 }
                 voiceActors(language: JAPANESE) {
                     name {
                         full
                     }
+                    image {
+                        large
+                    }
+                    siteUrl
                 }
             }
         }
@@ -154,13 +163,31 @@ def _format_characters(char_edges: list[dict]) -> str:
 
     lines = []
     for edge in char_edges:
-        char_name = edge.get("node", {}).get("name", {}).get("full", "Unknown")
-        char_image = edge.get("node", {}).get("image", {}).get("large", "")
+        node = edge.get("node", {})
+        char_name = node.get("name", {}).get("full", "Unknown")
+        char_image = node.get("image", {}).get("large", "")
+        char_url = node.get("siteUrl", "")
         role = edge.get("role", "UNKNOWN")
+
         va_list = edge.get("voiceActors", [])
-        va_name = va_list[0]["name"]["full"] if va_list else "N/A"
-        img_tag = f" [Image: {char_image}]" if char_image else ""
-        lines.append(f"  • {char_name} ({role}) — VA: {va_name}{img_tag}")
+        va = va_list[0] if va_list else {}
+        va_name = va.get("name", {}).get("full", "N/A") if va else "N/A"
+        va_image = va.get("image", {}).get("large", "") if va else ""
+        va_url = va.get("siteUrl", "") if va else ""
+
+        char_part = f"Character: {char_name} ({role})"
+        if char_image:
+            char_part += f" | Image: {char_image}"
+        if char_url:
+            char_part += f" | URL: {char_url}"
+
+        va_part = f"Voice Actor: {va_name}"
+        if va_image:
+            va_part += f" | Image: {va_image}"
+        if va_url:
+            va_part += f" | URL: {va_url}"
+
+        lines.append(f"  • {char_part} — {va_part}")
     return "\n".join(lines)
 
 
@@ -171,9 +198,17 @@ def _format_staff(staff_edges: list[dict]) -> str:
 
     lines = []
     for edge in staff_edges:
-        name = edge.get("node", {}).get("name", {}).get("full", "Unknown")
+        node = edge.get("node", {})
+        name = node.get("name", {}).get("full", "Unknown")
         role = edge.get("role", "Unknown role")
-        lines.append(f"  • {name} — {role}")
+        img = node.get("image", {}).get("large", "")
+        url = node.get("siteUrl", "")
+        info = f"  • {name} — {role}"
+        if img:
+            info += f" | Image: {img}"
+        if url:
+            info += f" | URL: {url}"
+        lines.append(info)
     return "\n".join(lines)
 
 

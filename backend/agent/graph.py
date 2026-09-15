@@ -14,6 +14,7 @@ from backend.agent.state import AgentState
 from backend.config import get_settings
 from backend.tools.get_anime_details import get_anime_details
 from backend.tools.search_anime import search_anime
+from backend.tools.search_studio import search_studio
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Tools registry
 # ──────────────────────────────────────────────────────────────────────
 
-TOOLS = [search_anime, get_anime_details]
+TOOLS = [search_anime, get_anime_details, search_studio]
 
 
 # ──────────────────────────────────────────────────────────────────────

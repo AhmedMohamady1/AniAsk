@@ -3,6 +3,10 @@ import cors from "cors";
 import morgan from "morgan";
 import { env } from "./config/configs";
 import errorHandlerMiddleware from "./middlewares/errors.middleware";
+import authRouter from "./routes/auth.route";
+import { db } from "./db/index";
+import { usersTable as ut } from "./db/schema/users";
+import cookieParser from "cookie-parser";
 
 const app = express();
 const PORT: Number = env.PORT;
@@ -17,6 +21,7 @@ app.use(
         credentials: true,
     }),
 );
+app.use(cookieParser());
 
 app.get("/health", (req: Request, res: Response) => {
     res.status(200).json({
@@ -25,6 +30,22 @@ app.get("/health", (req: Request, res: Response) => {
         uptime: process.uptime(),
     });
 });
+
+app.get("/", async (req: Request, res: Response) => {
+    const data = {
+        userId: ut.userId,
+        username: ut.username,
+        email: ut.email,
+        firstName: ut.firstName,
+        lastName: ut.lastName,
+        createdAt: ut.createdAt,
+        updatedAt: ut.updatedAt,
+    };
+    const users = await db.select(data).from(ut);
+    res.json({ data: users, message: "success" });
+});
+
+app.use("/auth", authRouter);
 
 app.use(errorHandlerMiddleware);
 

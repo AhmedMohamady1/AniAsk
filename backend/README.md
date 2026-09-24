@@ -5,9 +5,10 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5+-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169e1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.45+-C5F74F?style=for-the-badge&logo=drizzle&logoColor=black)](https://orm.drizzle.team/)
+[![GraphQL](https://img.shields.io/badge/GraphQL-AniList_API-e10098?style=for-the-badge&logo=graphql&logoColor=white)](https://anilist.gitbook.io/anilist-apiv2-docs)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ed?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-A type-safe, high-performance RESTful API powering **AniAsk** — handling user authentication, session security with refresh token rotation, and anime list tracking.
+A type-safe, high-performance RESTful API powering **AniAsk** — handling user authentication, session security with refresh token rotation, anime list tracking, and real-time anime discovery and search via the AniList GraphQL API.
 
 ---
 
@@ -19,6 +20,7 @@ A type-safe, high-performance RESTful API powering **AniAsk** — handling user 
 - [Database Schema](#-database-schema)
 - [API Reference](#-api-reference)
   - [Authentication Routes](#authentication-routes)
+  - [Anime Routes](#anime-routes)
   - [System Routes](#system-routes)
 - [Project Structure](#-project-structure)
 - [Getting Started](#-getting-started)
@@ -35,7 +37,9 @@ A type-safe, high-performance RESTful API powering **AniAsk** — handling user 
 ## ✨ Features
 
 - **Express 5 Core**: Leverages the latest Express 5 release featuring native async error handling.
-- **Strict TypeScript & Schema Validation**: End-to-end typing with runtime validation powered by **Zod**.
+- **Strict TypeScript & Schema Validation**: End-to-end typing with runtime validation powered by **Zod** across bodies, query params, and route parameters (`res.locals.validated`).
+- **AniList GraphQL Integration**: Built-in query service fetching real-time anime feeds from AniList API (trending, popular, top-rated, currently releasing) and keyword search.
+- **Rich Media & Character Metadata**: In-depth anime profiles including English/Romaji/Native titles, synopsis, studio credits, episode count, broadcast season/year, character rosters, and Japanese voice actors.
 - **Secure Authentication & Token Rotation**:
   - Short-lived JWT Access Tokens (e.g., 15 minutes) passed via `Authorization: Bearer <token>` headers.
   - Long-lived Refresh Tokens (e.g., 7 days) persisted in PostgreSQL and stored securely via `httpOnly`, `sameSite: strict` cookies.
@@ -59,6 +63,7 @@ A type-safe, high-performance RESTful API powering **AniAsk** — handling user 
 | **Database** | [PostgreSQL 17](https://www.postgresql.org/) |
 | **ORM & Migrations** | [Drizzle ORM](https://orm.drizzle.team/) & [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) |
 | **Validation** | [Zod](https://zod.dev/) |
+| **External Data Source** | [AniList GraphQL API](https://anilist.gitbook.io/anilist-apiv2-docs) (Anime & Manga metadata) |
 | **Authentication** | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) & [bcrypt](https://github.com/kelektiv/node.bcrypt.js) |
 | **Logging & Security** | [Morgan](https://github.com/expressjs/morgan), [Helmet](https://helmetjs.github.io/), [CORS](https://github.com/expressjs/cors), [Cookie-Parser](https://github.com/expressjs/cookie-parser) |
 | **Dev Tooling** | [tsx](https://github.com/privatenumber/tsx) (Fast TypeScript execution & hot reloading) |
@@ -258,6 +263,311 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
 
 ---
 
+### Anime Routes
+
+Public endpoints for browsing, searching, and inspecting anime media and voice actors powered directly by the AniList GraphQL API. All query and route parameters are validated using Zod via `validate()`.
+
+#### 1. Get Trending Anime
+Retrieves currently trending anime sorted by trend rank.
+
+- **Method**: `GET`
+- **Path**: `/anime/trending`
+- **Query Parameters**:
+  - `page` *(optional, integer, min: 1, default: `1`)*: Page number to retrieve.
+  - `perPage` *(optional, integer, min: 1, max: 50, default: `10`)*: Number of items per page.
+- **Example Request**:
+  ```http
+  GET /anime/trending?page=1&perPage=10
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "pageInfo": {
+        "currentPage": 1,
+        "hasNextPage": true,
+        "lastPage": 500,
+        "perPage": 10,
+        "total": 5000
+      },
+      "media": [
+        {
+          "id": 16498,
+          "title": {
+            "romaji": "Shingeki no Kyojin",
+            "english": "Attack on Titan",
+            "native": "進撃の巨人"
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx16498-m5nnRPzpfiMt.png",
+            "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498-m5nnRPzpfiMt.png"
+          },
+          "bannerImage": "https://s4.anilist.co/file/anilistcdn/media/anime/banner/16498-8jpFfDggPpCe.jpg",
+          "averageScore": 85,
+          "popularity": 583420,
+          "trending": 45,
+          "episodes": 25,
+          "status": "FINISHED",
+          "format": "TV",
+          "genres": [
+            "Action",
+            "Drama",
+            "Fantasy",
+            "Mystery"
+          ],
+          "startDate": {
+            "year": 2013,
+            "month": 4,
+            "day": 7
+          }
+        }
+      ]
+    }
+  }
+  ```
+
+---
+
+#### 2. Get Popular Anime
+Retrieves all-time most popular anime sorted by subscriber and community popularity count.
+
+- **Method**: `GET`
+- **Path**: `/anime/popular`
+- **Query Parameters**:
+  - `page` *(optional, integer, min: 1, default: `1`)*: Page number.
+  - `perPage` *(optional, integer, min: 1, max: 50, default: `10`)*: Items per page (max: 50).
+- **Example Request**:
+  ```http
+  GET /anime/popular?page=1&perPage=10
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "pageInfo": {
+        "currentPage": 1,
+        "hasNextPage": true,
+        "lastPage": 500,
+        "perPage": 10,
+        "total": 5000
+      },
+      "media": [ ... ]
+    }
+  }
+  ```
+
+---
+
+#### 3. Get Top-Rated Anime
+Retrieves highest rated anime sorted by average community score.
+
+- **Method**: `GET`
+- **Path**: `/anime/top-rated`
+- **Query Parameters**:
+  - `page` *(optional, integer, min: 1, default: `1`)*: Page number.
+  - `perPage` *(optional, integer, min: 1, max: 50, default: `10`)*: Items per page (max: 50).
+- **Example Request**:
+  ```http
+  GET /anime/top-rated?page=1&perPage=10
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "pageInfo": {
+        "currentPage": 1,
+        "hasNextPage": true,
+        "lastPage": 500,
+        "perPage": 10,
+        "total": 5000
+      },
+      "media": [ ... ]
+    }
+  }
+  ```
+
+---
+
+#### 4. Get Currently Airing Anime
+Retrieves currently releasing anime (`status: RELEASING`) sorted by popularity.
+
+- **Method**: `GET`
+- **Path**: `/anime/airing`
+- **Query Parameters**:
+  - `page` *(optional, integer, min: 1, default: `1`)*: Page number.
+  - `perPage` *(optional, integer, min: 1, max: 50, default: `10`)*: Items per page (max: 50).
+- **Example Request**:
+  ```http
+  GET /anime/airing?page=1&perPage=10
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "pageInfo": {
+        "currentPage": 1,
+        "hasNextPage": true,
+        "lastPage": 20,
+        "perPage": 10,
+        "total": 200
+      },
+      "media": [ ... ]
+    }
+  }
+  ```
+
+---
+
+#### 5. Search Anime
+Searches anime titles by natural language keyword or title query.
+
+- **Method**: `GET`
+- **Path**: `/anime/search`
+- **Query Parameters**:
+  - `q` *(required, string, 1–100 characters)*: Search query string.
+  - `page` *(optional, integer, min: 1, default: `1`)*: Page number.
+  - `perPage` *(optional, integer, min: 1, max: 50, default: `10`)*: Items per page (max: 50).
+- **Example Request**:
+  ```http
+  GET /anime/search?q=frieren&page=1&perPage=5
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "pageInfo": {
+        "currentPage": 1,
+        "hasNextPage": false,
+        "lastPage": 1,
+        "perPage": 5,
+        "total": 1
+      },
+      "media": [ ... ]
+    }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: If query parameter `q` is missing, blank, or exceeds 100 characters.
+  - `404 Not Found`: If no anime matches the search query:
+    ```json
+    {
+      "status": "fail",
+      "message": "No anime found matching the search query"
+    }
+    ```
+
+---
+
+#### 6. Get Anime Details by ID
+Retrieves full details for an anime by its AniList numeric ID, including synopsis, broadcast season/year, production studios, and characters with Japanese voice actors.
+
+- **Method**: `GET`
+- **Path**: `/anime/:id`
+- **Path Parameters**:
+  - `id` *(required, positive integer)*: AniList media identifier.
+- **Example Request**:
+  ```http
+  GET /anime/16498
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "id": 16498,
+      "idMal": 16498,
+      "title": {
+        "romaji": "Shingeki no Kyojin",
+        "english": "Attack on Titan",
+        "native": "進撃の巨人"
+      },
+      "description": "Several hundred years ago, humans were nearly exterminated by giants...",
+      "type": "ANIME",
+      "format": "TV",
+      "status": "FINISHED",
+      "startDate": { "year": 2013, "month": 4, "day": 7 },
+      "endDate": { "year": 2013, "month": 9, "day": 29 },
+      "season": "SPRING",
+      "seasonYear": 2013,
+      "episodes": 25,
+      "duration": 24,
+      "countryOfOrigin": "JP",
+      "isAdult": false,
+      "averageScore": 85,
+      "meanScore": 86,
+      "popularity": 583420,
+      "trending": 45,
+      "genres": [
+        "Action",
+        "Drama",
+        "Fantasy",
+        "Mystery"
+      ],
+      "coverImage": {
+        "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx16498-m5nnRPzpfiMt.png",
+        "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498-m5nnRPzpfiMt.png"
+      },
+      "bannerImage": "https://s4.anilist.co/file/anilistcdn/media/anime/banner/16498-8jpFfDggPpCe.jpg",
+      "studios": {
+        "edges": [
+          {
+            "isMain": true,
+            "node": {
+              "id": 858,
+              "name": "WIT STUDIO"
+            }
+          }
+        ]
+      },
+      "characters": {
+        "edges": [
+          {
+            "role": "MAIN",
+            "node": {
+              "id": 40882,
+              "name": {
+                "full": "Eren Yeager",
+                "native": "エレン・イェーガー"
+              },
+              "image": {
+                "large": "https://s4.anilist.co/file/anilistcdn/character/large/b40882-9tQ07f0wN5d8.png"
+              }
+            },
+            "voiceActors": [
+              {
+                "id": 95101,
+                "name": {
+                  "full": "Yuuki Kaji",
+                  "native": "梶裕貴"
+                },
+                "image": {
+                  "large": "https://s4.anilist.co/file/anilistcdn/staff/large/n95101-hE1p9YV2Z9V4.png"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: If `id` is not a valid positive number.
+  - `404 Not Found`: If no anime exists with the specified ID:
+    ```json
+    {
+      "status": "fail",
+      "message": "Anime with ID 99999999 not found"
+    }
+    ```
+
+---
+
 ### System Routes
 
 #### Health Check
@@ -287,7 +597,8 @@ backend/
     ├── config/
     │   └── configs.ts        # Zod-validated environment config
     ├── controllers/
-    │   └── auth.controller.ts# Request handlers for authentication
+    │   ├── anime.controller.ts# Request handlers for AniList anime catalog & search
+    │   └── auth.controller.ts # Request handlers for authentication
     ├── db/
     │   ├── index.ts          # Drizzle ORM client initialization
     │   └── schema/
@@ -299,18 +610,22 @@ backend/
     ├── middlewares/
     │   ├── auth.middleware.ts       # JWT Bearer token verification
     │   ├── errors.middleware.ts     # Global centralized error handler
-    │   └── validation.middleware.ts # Zod request validation middleware
+    │   └── validation.middleware.ts # Zod request validation middleware (res.locals.validated)
     ├── routes/
+    │   ├── anime.routes.ts   # Express router for /anime endpoints
     │   └── auth.route.ts     # Express router for /auth endpoints
     ├── services/
+    │   ├── anime.service.ts  # AniList GraphQL query client & data mapping
     │   └── auth.service.ts   # Business logic (hash, verify, DB transactions)
     ├── types/
+    │   ├── anime.types.ts    # AniList media, page, characters & query types
     │   ├── auth.types.ts     # Token payload & expiration types
     │   ├── express.d.ts      # Express Request type extensions (req.user)
     │   └── user.types.ts     # User & SafeUser data models
     ├── utils/
     │   └── auth.utils.ts     # JWT helpers, bcrypt hashing, cookie expiry logic
     ├── validators/
+    │   ├── anime.validator.ts# Zod schemas for pagination, search, and anime ID
     │   └── auth.validator.ts # Zod schemas for register & login payloads
     └── server.ts             # Express application entry point & listener
 ```
@@ -355,6 +670,7 @@ Ensure you have the following installed on your machine:
    REFRESH_TOKEN_SECRET="your_custom_refresh_secret_min_64_chars"
    ACCESS_TOKEN_EXPIRATION="15m"
    REFRESH_TOKEN_EXPIRATION="7d"
+   ANILIST_API_URL="https://graphql.anilist.co"
    ```
 
 ---

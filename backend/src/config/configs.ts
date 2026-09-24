@@ -16,6 +16,7 @@ const envSchema = z.object({
     REFRESH_TOKEN_SECRET: z.string().min(1),
     ACCESS_TOKEN_EXPIRATION: z.custom<JwtExpiresIn>(),
     REFRESH_TOKEN_EXPIRATION: z.custom<JwtExpiresIn>(),
+    ANILIST_API_URL: z.url().default("https://graphql.anilist.co"),
 });
 
 const parsed = envSchema.safeParse(process.env);

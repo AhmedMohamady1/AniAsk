@@ -53,8 +53,8 @@ export const registerUserSchema = z.object({
             .max(30, "Last name must not exceed 30 characters")
             .trim(),
     }),
-    params: z.object({}),
-    query: z.object({}),
+    params: z.object({}).default({}),
+    query: z.object({}).default({}),
 });
 
 export type RegisterUserInput = z.infer<typeof registerUserSchema>["body"];
@@ -93,8 +93,8 @@ export const loginUserSchema = z.object({
                 });
             }
         }),
-    params: z.object({}),
-    query: z.object({}),
+    params: z.object({}).default({}),
+    query: z.object({}).default({}),
 });
 
 export type LoginUserInput = z.infer<typeof loginUserSchema>["body"];

@@ -6,9 +6,10 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169e1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.45+-C5F74F?style=for-the-badge&logo=drizzle&logoColor=black)](https://orm.drizzle.team/)
 [![GraphQL](https://img.shields.io/badge/GraphQL-AniList_API-e10098?style=for-the-badge&logo=graphql&logoColor=white)](https://anilist.gitbook.io/anilist-apiv2-docs)
+[![Resend](https://img.shields.io/badge/Resend-Email_API-black?style=for-the-badge&logo=resend&logoColor=white)](https://resend.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ed?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-A type-safe, high-performance RESTful API powering **AniAsk** — handling user authentication, session security with refresh token rotation, anime list tracking, and real-time anime discovery and search via the AniList GraphQL API.
+A type-safe, high-performance RESTful API powering **AniAsk** — handling user authentication, email verification with OTP, session security with refresh token rotation, personalized anime watchlist tracking, and real-time anime discovery and search via the AniList GraphQL API.
 
 ---
 
@@ -20,6 +21,7 @@ A type-safe, high-performance RESTful API powering **AniAsk** — handling user 
 - [Database Schema](#-database-schema)
 - [API Reference](#-api-reference)
   - [Authentication Routes](#authentication-routes)
+  - [Tracking Routes](#tracking-routes)
   - [Anime Routes](#anime-routes)
   - [System Routes](#system-routes)
 - [Project Structure](#-project-structure)
@@ -45,8 +47,17 @@ A type-safe, high-performance RESTful API powering **AniAsk** — handling user 
   - Long-lived Refresh Tokens (e.g., 7 days) persisted in PostgreSQL and stored securely via `httpOnly`, `sameSite: strict` cookies.
   - Refresh token rotation and instant revocation on logout to mitigate token theft.
   - Client metadata tracking (User-Agent, IP address, last used timestamp).
+- **Email Verification & OTP**:
+  - Secure 6-digit one-time passcodes (OTP) hashed with bcrypt and persisted with expiration timestamps.
+  - Cooldown protection (60s) for resending verification codes and attempt limits (max 5) to prevent brute-force attacks.
+  - Mandatory email verification gate preventing unverified accounts from logging in.
+  - Automated transactional email delivery powered by **Resend**.
+- **Personalized Anime Watchlist Tracking**:
+  - Full CRUD operations to track anime watching status (`watching`, `completed`, `on_hold`, `dropped`, `planning`).
+  - Custom ratings support (0–100 integer scores).
+  - Composite unique constraints `(user_id, anime_id)` preventing duplicate tracking entries.
+  - Paginated user tracking queries automatically enriched with live AniList media metadata.
 - **PostgreSQL & Drizzle ORM**: Lightweight, fast SQL queries with full type inference and automated migrations via `drizzle-kit`.
-- **Anime Watchlist Tracking**: Database schema configured to manage personalized anime tracking (`watching`, `completed`, `on_hold`, `dropped`, `planning`) with user ratings.
 - **Dockerized Infrastructure**: Single-command PostgreSQL 17 setup via Docker Compose.
 - **Environment-Aware Error Handling**: Comprehensive error middleware with stack traces in development and sanitized error messages in production.
 
@@ -64,6 +75,7 @@ A type-safe, high-performance RESTful API powering **AniAsk** — handling user 
 | **ORM & Migrations** | [Drizzle ORM](https://orm.drizzle.team/) & [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) |
 | **Validation** | [Zod](https://zod.dev/) |
 | **External Data Source** | [AniList GraphQL API](https://anilist.gitbook.io/anilist-apiv2-docs) (Anime & Manga metadata) |
+| **Email Service** | [Resend](https://resend.com/) (Transactional email dispatch) |
 | **Authentication** | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) & [bcrypt](https://github.com/kelektiv/node.bcrypt.js) |
 | **Logging & Security** | [Morgan](https://github.com/expressjs/morgan), [Helmet](https://helmetjs.github.io/), [CORS](https://github.com/expressjs/cors), [Cookie-Parser](https://github.com/expressjs/cookie-parser) |
 | **Dev Tooling** | [tsx](https://github.com/privatenumber/tsx) (Fast TypeScript execution & hot reloading) |
@@ -80,10 +92,23 @@ sequenceDiagram
     actor Client
     participant API as AniAsk API
     participant DB as PostgreSQL DB
+    participant Email as Resend Email Service
+
+    Note over Client,Email: User Registration & OTP Verification
+    Client->>API: POST /auth/register { username, email, password, firstName, lastName }
+    API->>DB: Check if user exists & hash password
+    API->>DB: Insert user (emailVerified: false) & generate 6-digit OTP hash
+    API->>Email: Send verification OTP email
+    API-->>Client: 201 Created { message: "user created", user }
+
+    Client->>API: POST /auth/verify-email { email, otp }
+    API->>DB: Validate OTP hash, expiry & attempt limits
+    API->>DB: Update user (emailVerified: true) & delete verification record
+    API-->>Client: 200 OK { status: "success", message: "Email verified successfully" }
 
     Note over Client,DB: User Login Flow
     Client->>API: POST /auth/login { identifier, password }
-    API->>DB: Query user & verify bcrypt password hash
+    API->>DB: Query user & verify bcrypt password + check emailVerified = true
     API->>DB: Insert new refresh token record (IP, User-Agent, Expiry)
     API-->>Client: Set-Cookie: refresh-token (HttpOnly, Strict) + JSON { accessToken }
 
@@ -119,6 +144,7 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
 | `password` | `TEXT` | Not Null | Salted and hashed password via bcrypt |
 | `first_name` | `VARCHAR(30)` | Not Null | User's first name |
 | `last_name` | `VARCHAR(30)` | Not Null | User's last name |
+| `email_verified`| `BOOLEAN` | Default `false`, Not Null | Account email verification status |
 | `created_at` | `TIMESTAMP` | Default Now, Not Null | Creation timestamp |
 | `updated_at` | `TIMESTAMP` | Auto-update on modification | Last updated timestamp |
 
@@ -135,14 +161,24 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
 | `expires_at` | `TIMESTAMP` | Not Null | Token expiration timestamp |
 | `created_at` | `TIMESTAMP` | Default Now, Not Null | Issue timestamp |
 
-### 3. `tracking` Table
+### 3. `email_verifications` Table
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | Primary Key, Default Random | Verification record ID |
+| `user_id` | `UUID` | Foreign Key (`users.user_id`), Cascade Delete | Associated user |
+| `otp_hash` | `TEXT` | Not Null | Salted & hashed 6-digit OTP |
+| `expires_at` | `TIMESTAMP` | Not Null | OTP expiration timestamp |
+| `attempts` | `INTEGER` | Default `0`, Not Null | Failed verification attempt count (max 5) |
+| `created_at` | `TIMESTAMP` | Default Now, Not Null | Creation timestamp (used for 60s cooldown) |
+
+### 4. `tracking` Table
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | `UUID` | Primary Key, Default Random | Entry identifier |
 | `user_id` | `UUID` | Foreign Key (`users.user_id`), Cascade Delete | Associated user |
-| `anime_id` | `TEXT` | Not Null | AniList anime identifier |
+| `anime_id` | `INTEGER` | Not Null | AniList anime identifier |
 | `status` | `ENUM` | Not Null | `watching`, `completed`, `on_hold`, `dropped`, `planning` |
-| `ratings` | `INTEGER` | Nullable | User score / rating |
+| `ratings` | `INTEGER` | Nullable | User score / rating (0–100) |
 | `created_at` | `TIMESTAMP` | Default Now, Not Null | Creation timestamp |
 | `updated_at` | `TIMESTAMP` | Auto-update on modification | Last modified timestamp |
 
@@ -157,6 +193,8 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
 ### Authentication Routes
 
 #### 1. Register User
+Creates a new user account with `emailVerified: false` and generates a 6-digit verification OTP sent to the user's email address.
+
 - **Method**: `POST`
 - **Path**: `/auth/register`
 - **Request Body**:
@@ -179,6 +217,7 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
       "email": "otaku@example.com",
       "firstName": "Levi",
       "lastName": "Ackerman",
+      "emailVerified": false,
       "createdAt": "2026-09-19T15:00:00.000Z",
       "updatedAt": "2026-09-19T15:00:00.000Z"
     }
@@ -187,7 +226,79 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
 
 ---
 
-#### 2. Login User
+#### 2. Verify Email
+Verifies a user's account using the 6-digit OTP sent to their email address.
+
+- **Method**: `POST`
+- **Path**: `/auth/verify-email`
+- **Request Body**:
+  ```json
+  {
+    "email": "otaku@example.com",
+    "otp": "123456"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "message": "Email verified successfully"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: If OTP format is invalid (must be 6 digits), code is expired, or incorrect:
+    ```json
+    {
+      "status": "fail",
+      "message": "Invalid verification code"
+    }
+    ```
+  - `404 Not Found`: If no verification code exists for the account.
+  - `409 Conflict`: If the email has already been verified.
+  - `429 Too Many Requests`: Exceeded maximum allowable verification attempts (5 attempts):
+    ```json
+    {
+      "status": "fail",
+      "message": "Too many verification attempts"
+    }
+    ```
+
+---
+
+#### 3. Resend Verification Code
+Generates and sends a new 6-digit verification OTP to the user's email. Enforces a 60-second cooldown between requests.
+
+- **Method**: `POST`
+- **Path**: `/auth/resend-verification`
+- **Request Body**:
+  ```json
+  {
+    "email": "otaku@example.com"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "message": "Verification code sent successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: If no user exists with the provided email.
+  - `409 Conflict`: If the user's email is already verified.
+  - `429 Too Many Requests`: If requested before the 60-second cooldown expires:
+    ```json
+    {
+      "status": "fail",
+      "message": "Please wait before requesting another verification code"
+    }
+    ```
+
+---
+
+#### 4. Login User
+Authenticates a user with email/username and password. Requires the account's email to be verified before allowing login.
+
 - **Method**: `POST`
 - **Path**: `/auth/login`
 - **Request Body**: (Accepts either `email` or `username` along with `password`)
@@ -206,10 +317,19 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
   ```
+- **Error Responses**:
+  - `401 Unauthorized`: Invalid credentials.
+  - `403 Forbidden`: Email address has not been verified:
+    ```json
+    {
+      "status": "fail",
+      "message": "Please verify your email before logging in"
+    }
+    ```
 
 ---
 
-#### 3. Get Current User Profile
+#### 5. Get Current User Profile
 - **Method**: `GET`
 - **Path**: `/auth/me`
 - **Headers**:
@@ -224,6 +344,7 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
     "email": "otaku@example.com",
     "firstName": "Levi",
     "lastName": "Ackerman",
+    "emailVerified": true,
     "createdAt": "2026-09-19T15:00:00.000Z",
     "updatedAt": "2026-09-19T15:00:00.000Z"
   }
@@ -231,7 +352,7 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
 
 ---
 
-#### 4. Refresh Access Token
+#### 6. Refresh Access Token
 - **Method**: `POST`
 - **Path**: `/auth/refresh`
 - **Cookies Required**:
@@ -245,7 +366,7 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
 
 ---
 
-#### 5. Logout User
+#### 7. Logout User
 - **Method**: `POST`
 - **Path**: `/auth/logout`
 - **Headers**:
@@ -260,6 +381,212 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
     "message": "Logged out successfully"
   }
   ```
+
+### Tracking Routes
+
+Endpoints to manage a user's personal anime watchlist and scores. All tracking endpoints require a valid JWT Bearer access token (`Authorization: Bearer <accessToken>`).
+
+Allowed tracking statuses:
+- `watching`
+- `completed`
+- `on_hold`
+- `dropped`
+- `planning`
+
+Ratings are integers ranging from `0` to `100`.
+
+#### 1. Add Anime to Tracking List
+Adds an anime entry to the authenticated user's tracking list.
+
+- **Method**: `POST`
+- **Path**: `/tracking`
+- **Headers**:
+  ```http
+  Authorization: Bearer <accessToken>
+  ```
+- **Request Body**:
+  ```json
+  {
+    "animeId": 16498,
+    "status": "watching",
+    "ratings": 90
+  }
+  ```
+- **Response**: `201 Created`
+  ```json
+  {
+    "status": "success",
+    "data": [
+      {
+        "id": "c1f7b9e0-82a1-432d-94c3-1b9195b07802",
+        "userId": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+        "animeId": 16498,
+        "status": "watching",
+        "ratings": 90,
+        "createdAt": "2026-09-25T18:00:00.000Z",
+        "updatedAt": "2026-09-25T18:00:00.000Z"
+      }
+    ]
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: If `animeId` is invalid, `status` is not an allowed enum value, or `ratings` is outside 0–100.
+  - `401 Unauthorized`: Missing or invalid Bearer access token.
+  - `409 Conflict`: If the anime is already tracked by the user:
+    ```json
+    {
+      "status": "fail",
+      "message": "Tracking entry already exists for this anime"
+    }
+    ```
+
+---
+
+#### 2. Get User Tracking List
+Retrieves the authenticated user's tracked anime list with pagination, optional status filtering, and live AniList metadata for each entry.
+
+- **Method**: `GET`
+- **Path**: `/tracking`
+- **Headers**:
+  ```http
+  Authorization: Bearer <accessToken>
+  ```
+- **Query Parameters**:
+  - `status` *(optional, string)*: Filter by status (`watching`, `completed`, `on_hold`, `dropped`, `planning`).
+  - `page` *(optional, integer, min: 1, default: `1`)*: Page number.
+  - `perPage` *(optional, integer, min: 1, max: 50, default: `50`)*: Items per page.
+- **Example Request**:
+  ```http
+  GET /tracking?status=watching&page=1&perPage=10
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "data": [
+      {
+        "anime": {
+          "id": 16498,
+          "title": {
+            "romaji": "Shingeki no Kyojin",
+            "english": "Attack on Titan",
+            "native": "進撃の巨人"
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx16498-m5nnRPzpfiMt.png",
+            "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498-m5nnRPzpfiMt.png"
+          },
+          "bannerImage": "https://s4.anilist.co/file/anilistcdn/media/anime/banner/16498-8jpFfDggPpCe.jpg",
+          "averageScore": 85,
+          "popularity": 583420,
+          "trending": 45,
+          "episodes": 25,
+          "status": "FINISHED",
+          "format": "TV",
+          "genres": [
+            "Action",
+            "Drama",
+            "Fantasy",
+            "Mystery"
+          ],
+          "startDate": {
+            "year": 2013,
+            "month": 4,
+            "day": 7
+          }
+        },
+        "tracking": {
+          "id": "c1f7b9e0-82a1-432d-94c3-1b9195b07802",
+          "status": "watching",
+          "ratings": 90,
+          "createdAt": "2026-09-25T18:00:00.000Z",
+          "updatedAt": "2026-09-25T18:00:00.000Z"
+        }
+      }
+    ],
+    "pageInfo": {
+      "currentPage": 1,
+      "perPage": 10,
+      "total": 1,
+      "lastPage": 1,
+      "hasNextPage": false
+    }
+  }
+  ```
+
+---
+
+#### 3. Update Tracking Entry
+Updates the status and/or rating for a tracked anime entry by its AniList numeric ID. At least one field (`status` or `ratings`) must be provided.
+
+- **Method**: `PATCH`
+- **Path**: `/tracking/:animeId`
+- **Headers**:
+  ```http
+  Authorization: Bearer <accessToken>
+  ```
+- **Path Parameters**:
+  - `animeId` *(required, positive integer)*: AniList media identifier.
+- **Request Body**:
+  ```json
+  {
+    "status": "completed",
+    "ratings": 95
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "id": "c1f7b9e0-82a1-432d-94c3-1b9195b07802",
+      "userId": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+      "animeId": 16498,
+      "status": "completed",
+      "ratings": 95,
+      "createdAt": "2026-09-25T18:00:00.000Z",
+      "updatedAt": "2026-09-25T18:15:00.000Z"
+    }
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: If neither `status` nor `ratings` is provided, or values are invalid.
+  - `404 Not Found`: If no tracking record exists for this anime:
+    ```json
+    {
+      "status": "fail",
+      "message": "Tracking entry not found"
+    }
+    ```
+
+---
+
+#### 4. Delete Tracking Entry
+Removes an anime from the user's tracking list.
+
+- **Method**: `DELETE`
+- **Path**: `/tracking/:animeId`
+- **Headers**:
+  ```http
+  Authorization: Bearer <accessToken>
+  ```
+- **Path Parameters**:
+  - `animeId` *(required, positive integer)*: AniList media identifier.
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "message": "Tracking entry deleted successfully"
+  }
+  ```
+- **Error Responses**:
+  - `404 Not Found`: If no tracking record exists for this anime:
+    ```json
+    {
+      "status": "fail",
+      "message": "Tracking for anime 16498 not found"
+    }
+    ```
 
 ---
 
@@ -597,14 +924,16 @@ backend/
     ├── config/
     │   └── configs.ts        # Zod-validated environment config
     ├── controllers/
-    │   ├── anime.controller.ts# Request handlers for AniList anime catalog & search
-    │   └── auth.controller.ts # Request handlers for authentication
+    │   ├── anime.controller.ts    # Request handlers for AniList anime catalog & search
+    │   ├── auth.controller.ts     # Request handlers for authentication & email verification
+    │   └── tracking.controller.ts # Request handlers for anime watchlist tracking
     ├── db/
     │   ├── index.ts          # Drizzle ORM client initialization
     │   └── schema/
-    │       ├── index.ts      # Schema barrel exports
-    │       ├── users.ts      # users & refresh_tokens table definitions
-    │       └── tracker.ts    # tracking table & status enum definitions
+    │       ├── index.ts              # Schema barrel exports
+    │       ├── email-verification.ts # email_verifications table definition
+    │       ├── tracker.ts            # tracking table & status enum definitions
+    │       └── users.ts              # users & refresh_tokens table definitions
     ├── errors/
     │   └── custom.errors.ts  # CustomError class with status codes
     ├── middlewares/
@@ -612,21 +941,27 @@ backend/
     │   ├── errors.middleware.ts     # Global centralized error handler
     │   └── validation.middleware.ts # Zod request validation middleware (res.locals.validated)
     ├── routes/
-    │   ├── anime.routes.ts   # Express router for /anime endpoints
-    │   └── auth.route.ts     # Express router for /auth endpoints
+    │   ├── anime.routes.ts    # Express router for /anime endpoints
+    │   ├── auth.route.ts      # Express router for /auth endpoints
+    │   └── tracking.routes.ts # Express router for /tracking endpoints
     ├── services/
-    │   ├── anime.service.ts  # AniList GraphQL query client & data mapping
-    │   └── auth.service.ts   # Business logic (hash, verify, DB transactions)
+    │   ├── anime.service.ts              # AniList GraphQL query client & batch lookup
+    │   ├── auth.service.ts               # Auth logic (hash, verify, login, DB transactions)
+    │   ├── email-verification.service.ts # OTP generation, hashing, attempt limits & cooldown
+    │   ├── email.service.ts              # Email delivery via Resend
+    │   └── tracking.service.ts           # Anime tracking CRUD business logic
     ├── types/
     │   ├── anime.types.ts    # AniList media, page, characters & query types
     │   ├── auth.types.ts     # Token payload & expiration types
     │   ├── express.d.ts      # Express Request type extensions (req.user)
+    │   ├── tracking.types.ts # Anime tracking status enums and types
     │   └── user.types.ts     # User & SafeUser data models
     ├── utils/
-    │   └── auth.utils.ts     # JWT helpers, bcrypt hashing, cookie expiry logic
+    │   └── auth.utils.ts     # JWT helpers, bcrypt hashing, cookie & expiration logic
     ├── validators/
-    │   ├── anime.validator.ts# Zod schemas for pagination, search, and anime ID
-    │   └── auth.validator.ts # Zod schemas for register & login payloads
+    │   ├── anime.validator.ts    # Zod schemas for pagination, search, and anime ID
+    │   ├── auth.validator.ts     # Zod schemas for register, login, & OTP verification
+    │   └── tracking.validator.ts # Zod schemas for tracking CRUD requests
     └── server.ts             # Express application entry point & listener
 ```
 
@@ -668,9 +1003,12 @@ Ensure you have the following installed on your machine:
    DATABASE_URL="postgresql://postgres:postgres@localhost:5432/aniask"
    ACCESS_TOKEN_SECRET="your_custom_access_secret_min_64_chars"
    REFRESH_TOKEN_SECRET="your_custom_refresh_secret_min_64_chars"
+   OTP_EXPIRATION="10m"
    ACCESS_TOKEN_EXPIRATION="15m"
    REFRESH_TOKEN_EXPIRATION="7d"
    ANILIST_API_URL="https://graphql.anilist.co"
+   RESEND_API_KEY="re_123456789"
+   EMAIL_FROM="onboarding@resend.dev"
    ```
 
 ---
@@ -752,5 +1090,8 @@ The API will be available at:
 
 - **Strict Input Validation**: Zod validates all input payloads before reaching controller handlers, throwing structured 400 Bad Request errors.
 - **Credential Storage**: Passwords are never stored in plain text and are hashed using **bcrypt** with salted iterations.
+- **OTP Hashing & Rate Limiting**: OTPs are cryptographically hashed using bcrypt before database storage. Resend requests enforce a 60-second cooldown, and verification attempts are capped at 5 tries to prevent brute-force attacks.
+- **Mandatory Email Verification**: Accounts must verify their email address before access/refresh tokens are granted on login.
 - **Fail-Safe Startup**: Zod validates all critical environment variables on startup; if any key is missing or invalid, the process terminates immediately with an error tree.
 - **Token Invalidation**: Refresh tokens can be individually revoked in the database, allowing users to log out from specific sessions or terminate compromised sessions immediately.
+- **Resource Ownership Authorization**: Anime watchlist tracking endpoints enforce user authentication via JWT Bearer tokens, isolating list modifications to each verified user account.

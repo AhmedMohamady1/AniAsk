@@ -16,6 +16,11 @@ import { SafeUser } from "../types/user.types";
 import { eq, or, SQL } from "drizzle-orm";
 import CustomError from "../errors/custom.errors";
 import { env } from "../config/configs";
+import {
+    createEmailVerification,
+    verifyEmailOtp,
+} from "./email-verification.service";
+import { sendVerificationEmail } from "./email.service";
 
 export async function registerUser(data: RegisterUserInput): Promise<SafeUser> {
     const existingUser = await db.query.usersTable.findFirst({
@@ -31,18 +36,39 @@ export async function registerUser(data: RegisterUserInput): Promise<SafeUser> {
 
     const hashedPassword = await hashPassword(data.password);
 
-    const [user] = await db
-        .insert(usersTable)
-        .values({
-            username: data.username,
-            password: hashedPassword,
-            email: data.email,
-            firstName: data.firstName,
-            lastName: data.lastName,
-        })
-        .returning();
+    const { user, otp } = await db.transaction(async (tx) => {
+        const [user] = await tx
+            .insert(usersTable)
+            .values({
+                username: data.username,
+                password: hashedPassword,
+                email: data.email,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                emailVerified: false,
+            })
+            .returning();
+
+        const otp = await createEmailVerification(tx, user.userId);
+        return { user, otp };
+    });
+
+    // const [user] = await db
+    //     .insert(usersTable)
+    //     .values({
+    //         username: data.username,
+    //         password: hashedPassword,
+    //         email: data.email,
+    //         firstName: data.firstName,
+    //         lastName: data.lastName,
+    //     })
+    //     .returning();
+
+    // const otp = await createEmailVerification(user.userId);
+    await sendVerificationEmail(user.email, otp);
 
     const { password, ...safeUser } = user;
+
     return safeUser;
 }
 
@@ -64,6 +90,13 @@ export async function loginUser(
 
     if (!isPasswordCorrect) {
         throw new CustomError("Invalid credentials", 401);
+    }
+
+    if (!user.emailVerified) {
+        throw new CustomError(
+            "Please verify your email before logging in",
+            403,
+        );
     }
 
     const refreshToken = generateRefreshToken(user.userId);
@@ -134,4 +167,40 @@ export async function logoutUser(refreshToken: string) {
         .update(refreshTokenTable)
         .set({ revoked: true })
         .where(eq(refreshTokenTable.token, refreshToken));
+}
+
+export async function verifyUserEmail(email: string, otp: string) {
+    const user = await db.query.usersTable.findFirst({
+        where: eq(usersTable.email, email),
+    });
+
+    if (!user) {
+        throw new CustomError("Invalid verification request", 400);
+    }
+
+    if (user.emailVerified) {
+        throw new CustomError("Email is already verified", 409);
+    }
+
+    await verifyEmailOtp(user.userId, otp);
+}
+
+export async function resendEmailVerification(email: string) {
+    const user = await db.query.usersTable.findFirst({
+        where: eq(usersTable.email, email),
+    });
+
+    if (!user) {
+        throw new CustomError("User not found", 404);
+    }
+
+    if (user.emailVerified) {
+        throw new CustomError("Email is already verified", 409);
+    }
+
+    const otp = await db.transaction(async (tx) => {
+        return await createEmailVerification(tx, user.userId);
+    });
+
+    await sendVerificationEmail(user.email, otp);
 }

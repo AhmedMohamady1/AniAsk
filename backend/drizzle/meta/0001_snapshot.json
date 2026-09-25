@@ -1,6 +1,6 @@
 {
-  "id": "1bfebc12-ec93-4c26-81b7-6553829cb53e",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "5da6481b-2ca7-423d-979f-075f41548032",
+  "prevId": "1bfebc12-ec93-4c26-81b7-6553829cb53e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -137,6 +137,13 @@
           "type": "varchar(30)",
           "primaryKey": false,
           "notNull": true
+        },
+        "email_verified": {
+          "name": "email_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",

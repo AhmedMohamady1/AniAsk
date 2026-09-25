@@ -8,14 +8,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 import { pgEnum } from "drizzle-orm/pg-core";
+import { TRACKING_STATUSES } from "../../types/tracking.types";
 
-export const trackingStatus = pgEnum("tracking_status", [
-    "watching",
-    "completed",
-    "on_hold",
-    "dropped",
-    "planning",
-]);
+export const trackingStatus = pgEnum("tracking_status", TRACKING_STATUSES);
 
 export const trackingTable = pgTable(
     "tracking",
@@ -26,7 +21,7 @@ export const trackingTable = pgTable(
                 onDelete: "cascade",
             })
             .notNull(),
-        animeId: text("anime_id").notNull(),
+        animeId: integer("anime_id").notNull(),
         status: trackingStatus("status").notNull(),
         ratings: integer("ratings"),
         createdAt: timestamp("created_at").defaultNow().notNull(),

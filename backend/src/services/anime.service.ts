@@ -11,7 +11,7 @@ interface AniListResponse<T> {
     }[];
 }
 
-async function queryAniList<T>(
+export async function queryAniList<T>(
     query: string,
     variables: Record<string, unknown> = {},
 ): Promise<T> {
@@ -363,4 +363,60 @@ export async function getAnimeById(id: number) {
     }
 
     return result.Media;
+}
+
+export async function getAnimeByIds(ids: number[]) {
+    if (ids.length === 0) {
+        return [];
+    }
+
+    const query = `
+        query ($ids: [Int]) {
+            Page {
+                media(
+                    id_in: $ids
+                    type: ANIME
+                ) {
+                    id
+
+                    title {
+                        romaji
+                        english
+                        native
+                    }
+
+                    coverImage {
+                        large
+                        extraLarge
+                    }
+
+                    bannerImage
+
+                    averageScore
+                    popularity
+                    trending
+
+                    episodes
+                    status
+                    format
+
+                    genres
+
+                    startDate {
+                        year
+                        month
+                        day
+                    }
+                }
+            }
+        }
+    `;
+
+    const result = await queryAniList<{
+        Page: AniListPage;
+    }>(query, {
+        ids,
+    });
+
+    return result.Page.media;
 }

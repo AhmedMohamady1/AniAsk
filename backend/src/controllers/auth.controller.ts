@@ -5,6 +5,8 @@ import {
     logoutUser,
     refreshAccessToken,
     registerUser,
+    resendEmailVerification,
+    verifyUserEmail,
 } from "../services/auth.service";
 import {
     LoginUserInput,
@@ -12,6 +14,7 @@ import {
 } from "../validators/auth.validator";
 import { env } from "../config/configs";
 import { isProd, transformExpirationToDate } from "../utils/auth.utils";
+import { stat } from "fs";
 
 export const register = async (req: Request, res: Response) => {
     const data: RegisterUserInput = req.body;
@@ -70,4 +73,24 @@ export const logout = async (req: Request, res: Response) => {
         });
     }
     res.status(200).json({ success: true, message: "Logged out successfully" });
+};
+
+export const verifyEmail = async (req: Request, res: Response) => {
+    const { email, otp } = req.body;
+    await verifyUserEmail(email, otp);
+    res.status(200).json({
+        status: "success",
+        message: "Email verified successfully",
+    });
+};
+
+export const resendVerification = async (req: Request, res: Response) => {
+    const { email } = res.locals.validated.body;
+
+    await resendEmailVerification(email);
+
+    res.status(200).json({
+        status: "success",
+        message: "Verification code sent successfully",
+    });
 };

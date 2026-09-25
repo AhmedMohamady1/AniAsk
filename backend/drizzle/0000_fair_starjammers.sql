@@ -28,7 +28,7 @@ CREATE TABLE "users" (
 CREATE TABLE "tracking" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
-	"anime_id" text NOT NULL,
+	"anime_id" integer NOT NULL,
 	"status" "tracking_status" NOT NULL,
 	"ratings" integer,
 	"created_at" timestamp DEFAULT now() NOT NULL,

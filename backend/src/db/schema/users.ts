@@ -5,6 +5,7 @@ import {
     timestamp,
     text,
     boolean,
+    integer,
 } from "drizzle-orm/pg-core";
 
 export const usersTable = pgTable("users", {
@@ -14,6 +15,7 @@ export const usersTable = pgTable("users", {
     password: text("password").notNull(),
     firstName: varchar("first_name", { length: 30 }).notNull(),
     lastName: varchar("last_name", { length: 30 }).notNull(),
+    emailVerified: boolean("email_verified").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
         .$onUpdate(() => new Date())

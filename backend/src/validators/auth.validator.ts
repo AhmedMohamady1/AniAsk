@@ -1,4 +1,4 @@
-import { email, z } from "zod";
+import { z } from "zod";
 
 export const registerUserSchema = z.object({
     body: z.object({
@@ -98,3 +98,27 @@ export const loginUserSchema = z.object({
 });
 
 export type LoginUserInput = z.infer<typeof loginUserSchema>["body"];
+
+export const verifyEmailSchema = z.object({
+    body: z.object({
+        email: z
+            .email("Invalid email address")
+            .trim()
+            .lowercase("Email must be lowercased"),
+        otp: z
+            .string({ error: "OTP is required" })
+            .regex(/^\d{6}$/, "OTP must be 6 digits"),
+    }),
+
+    query: z.object({}).default({}),
+    params: z.object({}).default({}),
+});
+
+export const resendVerificationSchema = z.object({
+    body: z.object({
+        email: z.email(),
+    }),
+
+    query: z.object({}).default({}),
+    params: z.object({}).default({}),
+});

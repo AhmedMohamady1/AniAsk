@@ -14,9 +14,12 @@ const envSchema = z.object({
     DATABASE_URL: z.string().startsWith("postgresql://"),
     ACCESS_TOKEN_SECRET: z.string().min(1),
     REFRESH_TOKEN_SECRET: z.string().min(1),
+    OTP_EXPIRATION: z.custom<JwtExpiresIn>(),
     ACCESS_TOKEN_EXPIRATION: z.custom<JwtExpiresIn>(),
     REFRESH_TOKEN_EXPIRATION: z.custom<JwtExpiresIn>(),
     ANILIST_API_URL: z.url().default("https://graphql.anilist.co"),
+    RESEND_API_KEY: z.string().min(1),
+    EMAIL_FROM: z.email(),
 });
 
 const parsed = envSchema.safeParse(process.env);

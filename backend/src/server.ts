@@ -5,6 +5,7 @@ import { env } from "./config/configs";
 import errorHandlerMiddleware from "./middlewares/errors.middleware";
 import authRouter from "./routes/auth.route";
 import animeRouter from "./routes/anime.routes";
+import trackingRouter from "./routes/tracking.routes";
 import { db } from "./db/index";
 import { usersTable as ut } from "./db/schema/users";
 import cookieParser from "cookie-parser";
@@ -48,6 +49,7 @@ app.get("/", async (req: Request, res: Response) => {
 
 app.use("/auth", authRouter);
 app.use("/anime", animeRouter);
+app.use("/tracking", trackingRouter);
 
 app.use(errorHandlerMiddleware);
 

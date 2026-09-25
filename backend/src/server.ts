@@ -33,19 +33,19 @@ app.get("/health", (req: Request, res: Response) => {
     });
 });
 
-app.get("/", async (req: Request, res: Response) => {
-    const data = {
-        userId: ut.userId,
-        username: ut.username,
-        email: ut.email,
-        firstName: ut.firstName,
-        lastName: ut.lastName,
-        createdAt: ut.createdAt,
-        updatedAt: ut.updatedAt,
-    };
-    const users = await db.select(data).from(ut);
-    res.json({ data: users, message: "success" });
-});
+// app.get("/", async (req: Request, res: Response) => {
+//     const data = {
+//         userId: ut.userId,
+//         username: ut.username,
+//         email: ut.email,
+//         firstName: ut.firstName,
+//         lastName: ut.lastName,
+//         createdAt: ut.createdAt,
+//         updatedAt: ut.updatedAt,
+//     };
+//     const users = await db.select(data).from(ut);
+//     res.json({ data: users, message: "success" });
+// });
 
 app.use("/auth", authRouter);
 app.use("/anime", animeRouter);

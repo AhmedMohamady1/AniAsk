@@ -6,10 +6,10 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169e1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.45+-C5F74F?style=for-the-badge&logo=drizzle&logoColor=black)](https://orm.drizzle.team/)
 [![GraphQL](https://img.shields.io/badge/GraphQL-AniList_API-e10098?style=for-the-badge&logo=graphql&logoColor=white)](https://anilist.gitbook.io/anilist-apiv2-docs)
-[![Resend](https://img.shields.io/badge/Resend-Email_API-black?style=for-the-badge&logo=resend&logoColor=white)](https://resend.com/)
+[![Nodemailer](https://img.shields.io/badge/Nodemailer-SMTP-007acc?style=for-the-badge&logo=nodemailer&logoColor=white)](https://nodemailer.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ed?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-A type-safe, high-performance RESTful API powering **AniAsk** — handling user authentication, email verification with OTP, session security with refresh token rotation, personalized anime watchlist tracking, and real-time anime discovery and search via the AniList GraphQL API.
+A type-safe, high-performance RESTful API powering **AniAsk** — handling user authentication, email verification with OTP via SMTP (Nodemailer), session security with refresh token rotation, personalized anime watchlist tracking (with ratings and reviews), and real-time anime discovery and search via the AniList GraphQL API.
 
 ---
 
@@ -51,10 +51,10 @@ A type-safe, high-performance RESTful API powering **AniAsk** — handling user 
   - Secure 6-digit one-time passcodes (OTP) hashed with bcrypt and persisted with expiration timestamps.
   - Cooldown protection (60s) for resending verification codes and attempt limits (max 5) to prevent brute-force attacks.
   - Mandatory email verification gate preventing unverified accounts from logging in.
-  - Automated transactional email delivery powered by **Resend**.
+  - Automated transactional email delivery powered by **Nodemailer** using SMTP configuration.
 - **Personalized Anime Watchlist Tracking**:
   - Full CRUD operations to track anime watching status (`watching`, `completed`, `on_hold`, `dropped`, `planning`).
-  - Custom ratings support (0–100 integer scores).
+  - Custom ratings support (0–100 integer scores) and personal text reviews / notes.
   - Composite unique constraints `(user_id, anime_id)` preventing duplicate tracking entries.
   - Paginated user tracking queries automatically enriched with live AniList media metadata.
 - **PostgreSQL & Drizzle ORM**: Lightweight, fast SQL queries with full type inference and automated migrations via `drizzle-kit`.
@@ -75,7 +75,7 @@ A type-safe, high-performance RESTful API powering **AniAsk** — handling user 
 | **ORM & Migrations** | [Drizzle ORM](https://orm.drizzle.team/) & [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) |
 | **Validation** | [Zod](https://zod.dev/) |
 | **External Data Source** | [AniList GraphQL API](https://anilist.gitbook.io/anilist-apiv2-docs) (Anime & Manga metadata) |
-| **Email Service** | [Resend](https://resend.com/) (Transactional email dispatch) |
+| **Email Service** | [Nodemailer](https://nodemailer.com/) (SMTP transactional email dispatch) |
 | **Authentication** | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) & [bcrypt](https://github.com/kelektiv/node.bcrypt.js) |
 | **Logging & Security** | [Morgan](https://github.com/expressjs/morgan), [Helmet](https://helmetjs.github.io/), [CORS](https://github.com/expressjs/cors), [Cookie-Parser](https://github.com/expressjs/cookie-parser) |
 | **Dev Tooling** | [tsx](https://github.com/privatenumber/tsx) (Fast TypeScript execution & hot reloading) |
@@ -92,13 +92,13 @@ sequenceDiagram
     actor Client
     participant API as AniAsk API
     participant DB as PostgreSQL DB
-    participant Email as Resend Email Service
+    participant Email as SMTP Email Service (Nodemailer)
 
     Note over Client,Email: User Registration & OTP Verification
     Client->>API: POST /auth/register { username, email, password, firstName, lastName }
     API->>DB: Check if user exists & hash password
     API->>DB: Insert user (emailVerified: false) & generate 6-digit OTP hash
-    API->>Email: Send verification OTP email
+    API->>Email: Send verification OTP email via SMTP
     API-->>Client: 201 Created { message: "user created", user }
 
     Client->>API: POST /auth/verify-email { email, otp }
@@ -179,6 +179,7 @@ The database is managed with Drizzle ORM schemas in `src/db/schema/`:
 | `anime_id` | `INTEGER` | Not Null | AniList anime identifier |
 | `status` | `ENUM` | Not Null | `watching`, `completed`, `on_hold`, `dropped`, `planning` |
 | `ratings` | `INTEGER` | Nullable | User score / rating (0–100) |
+| `reviews` | `TEXT` | Nullable | Optional user review or personal notes |
 | `created_at` | `TIMESTAMP` | Default Now, Not Null | Creation timestamp |
 | `updated_at` | `TIMESTAMP` | Auto-update on modification | Last modified timestamp |
 
@@ -393,7 +394,7 @@ Allowed tracking statuses:
 - `dropped`
 - `planning`
 
-Ratings are integers ranging from `0` to `100`.
+Ratings are integers ranging from `0` to `100`. Reviews are optional text strings for user impressions or personal notes.
 
 #### 1. Add Anime to Tracking List
 Adds an anime entry to the authenticated user's tracking list.
@@ -409,7 +410,8 @@ Adds an anime entry to the authenticated user's tracking list.
   {
     "animeId": 16498,
     "status": "watching",
-    "ratings": 90
+    "ratings": 90,
+    "reviews": "Masterpiece with incredible storytelling and animation."
   }
   ```
 - **Response**: `201 Created`
@@ -423,6 +425,7 @@ Adds an anime entry to the authenticated user's tracking list.
         "animeId": 16498,
         "status": "watching",
         "ratings": 90,
+        "reviews": "Masterpiece with incredible storytelling and animation.",
         "createdAt": "2026-09-25T18:00:00.000Z",
         "updatedAt": "2026-09-25T18:00:00.000Z"
       }
@@ -499,6 +502,7 @@ Retrieves the authenticated user's tracked anime list with pagination, optional 
           "id": "c1f7b9e0-82a1-432d-94c3-1b9195b07802",
           "status": "watching",
           "ratings": 90,
+          "reviews": "Masterpiece with incredible storytelling and animation.",
           "createdAt": "2026-09-25T18:00:00.000Z",
           "updatedAt": "2026-09-25T18:00:00.000Z"
         }
@@ -517,7 +521,7 @@ Retrieves the authenticated user's tracked anime list with pagination, optional 
 ---
 
 #### 3. Update Tracking Entry
-Updates the status and/or rating for a tracked anime entry by its AniList numeric ID. At least one field (`status` or `ratings`) must be provided.
+Updates the status, rating, and/or review for a tracked anime entry by its AniList numeric ID. At least one field (`status`, `ratings`, or `reviews`) must be provided.
 
 - **Method**: `PATCH`
 - **Path**: `/tracking/:animeId`
@@ -531,7 +535,8 @@ Updates the status and/or rating for a tracked anime entry by its AniList numeri
   ```json
   {
     "status": "completed",
-    "ratings": 95
+    "ratings": 95,
+    "reviews": "Updated review: An absolute masterpiece from start to finish."
   }
   ```
 - **Response**: `200 OK`
@@ -544,13 +549,14 @@ Updates the status and/or rating for a tracked anime entry by its AniList numeri
       "animeId": 16498,
       "status": "completed",
       "ratings": 95,
+      "reviews": "Updated review: An absolute masterpiece from start to finish.",
       "createdAt": "2026-09-25T18:00:00.000Z",
       "updatedAt": "2026-09-25T18:15:00.000Z"
     }
   }
   ```
 - **Error Responses**:
-  - `400 Bad Request`: If neither `status` nor `ratings` is provided, or values are invalid.
+  - `400 Bad Request`: If neither `status`, `ratings`, nor `reviews` is provided, or values are invalid.
   - `404 Not Found`: If no tracking record exists for this anime:
     ```json
     {
@@ -948,7 +954,7 @@ backend/
     │   ├── anime.service.ts              # AniList GraphQL query client & batch lookup
     │   ├── auth.service.ts               # Auth logic (hash, verify, login, DB transactions)
     │   ├── email-verification.service.ts # OTP generation, hashing, attempt limits & cooldown
-    │   ├── email.service.ts              # Email delivery via Resend
+    │   ├── email.service.ts              # Email delivery via Nodemailer (SMTP)
     │   └── tracking.service.ts           # Anime tracking CRUD business logic
     ├── types/
     │   ├── anime.types.ts    # AniList media, page, characters & query types
@@ -1007,8 +1013,11 @@ Ensure you have the following installed on your machine:
    ACCESS_TOKEN_EXPIRATION="15m"
    REFRESH_TOKEN_EXPIRATION="7d"
    ANILIST_API_URL="https://graphql.anilist.co"
-   RESEND_API_KEY="re_123456789"
-   EMAIL_FROM="onboarding@resend.dev"
+   SMTP_HOST="smtp.example.com"
+   SMTP_PORT=587
+   SMTP_USER="user@example.com"
+   SMTP_PASSWORD="your-smtp-password"
+   EMAIL_FROM="noreply@example.com"
    ```
 
 ---

@@ -18,7 +18,7 @@ const envSchema = z.object({
     ACCESS_TOKEN_EXPIRATION: z.custom<JwtExpiresIn>(),
     REFRESH_TOKEN_EXPIRATION: z.custom<JwtExpiresIn>(),
     ANILIST_API_URL: z.url().default("https://graphql.anilist.co"),
-    RESEND_API_KEY: z.string().min(1),
+    // RESEND_API_KEY: z.string().min(1),
     SMTP_HOST: z.string().min(1),
     SMTP_PORT: z.coerce.number().default(587),
     SMTP_USER: z.string().min(1),

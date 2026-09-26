@@ -21,6 +21,8 @@ const envSchema = z.object({
     RESEND_API_KEY: z.string().min(1),
     SMTP_HOST: z.string().min(1),
     SMTP_PORT: z.coerce.number().default(587),
+    SMTP_USER: z.string().min(1),
+    SMTP_PASSWORD: z.string().min(1),
     EMAIL_FROM: z.email(),
 });
 

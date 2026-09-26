@@ -52,11 +52,12 @@ A type-safe, high-performance RESTful API powering **AniAsk** — handling user 
   - Cooldown protection (60s) for resending verification codes and attempt limits (max 5) to prevent brute-force attacks.
   - Mandatory email verification gate preventing unverified accounts from logging in.
   - Automated transactional email delivery powered by **Nodemailer** using SMTP configuration.
-- **Personalized Anime Watchlist Tracking**:
+- **Personalized Anime Watchlist & Community Feedback**:
   - Full CRUD operations to track anime watching status (`watching`, `completed`, `on_hold`, `dropped`, `planning`).
   - Custom ratings support (0–100 integer scores) and personal text reviews / notes.
   - Composite unique constraints `(user_id, anime_id)` preventing duplicate tracking entries.
   - Paginated user tracking queries automatically enriched with live AniList media metadata.
+  - Public community endpoints to retrieve all users' reviews/scores and aggregate average ratings per anime.
 - **PostgreSQL & Drizzle ORM**: Lightweight, fast SQL queries with full type inference and automated migrations via `drizzle-kit`.
 - **Dockerized Infrastructure**: Single-command PostgreSQL 17 setup via Docker Compose.
 - **Environment-Aware Error Handling**: Comprehensive error middleware with stack traces in development and sanitized error messages in production.
@@ -385,7 +386,10 @@ Authenticates a user with email/username and password. Requires the account's em
 
 ### Tracking Routes
 
-Endpoints to manage a user's personal anime watchlist and scores. All tracking endpoints require a valid JWT Bearer access token (`Authorization: Bearer <accessToken>`).
+Endpoints to manage personal anime watchlist items, scores, reviews, and community-wide anime feedback.
+
+- **User-Specific Tracking** (`POST /tracking`, `GET /tracking`, `PATCH /tracking/:animeId`, `DELETE /tracking/:animeId`): Requires a valid JWT Bearer access token (`Authorization: Bearer <accessToken>`).
+- **Public Community Feedback** (`GET /tracking/:animeId/reviews`, `GET /tracking/:animeId/average-rating`): Public endpoints accessible without authentication.
 
 Allowed tracking statuses:
 - `watching`
@@ -591,6 +595,91 @@ Removes an anime from the user's tracking list.
     {
       "status": "fail",
       "message": "Tracking for anime 16498 not found"
+    }
+    ```
+
+---
+
+#### 5. Get All Users' Reviews for an Anime
+Retrieves all tracking entries, user ratings, and reviews submitted by the community for a specific anime by its AniList ID, including the username of each reviewer.
+
+- **Method**: `GET`
+- **Path**: `/tracking/:animeId/reviews`
+- **Authentication**: None (Public)
+- **Path Parameters**:
+  - `animeId` *(required, positive integer)*: AniList media identifier.
+- **Example Request**:
+  ```http
+  GET /tracking/16498/reviews
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "data": [
+      {
+        "id": "c1f7b9e0-82a1-432d-94c3-1b9195b07802",
+        "animeId": 16498,
+        "username": "johndoe",
+        "status": "completed",
+        "ratings": 95,
+        "reviews": "Masterpiece with incredible storytelling and animation.",
+        "createdAt": "2026-09-25T18:00:00.000Z",
+        "updatedAt": "2026-09-25T18:15:00.000Z"
+      },
+      {
+        "id": "e2a4b8c1-1234-4567-89ab-cdef01234567",
+        "animeId": 16498,
+        "username": "animelover",
+        "status": "watching",
+        "ratings": 88,
+        "reviews": "Loving the character development and soundtrack!",
+        "createdAt": "2026-09-26T12:00:00.000Z",
+        "updatedAt": "2026-09-26T12:00:00.000Z"
+      }
+    ]
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request`: If `animeId` is invalid or not a positive integer:
+    ```json
+    {
+      "status": "fail",
+      "message": "Anime ID must be a positive number"
+    }
+    ```
+
+---
+
+#### 6. Get Average Rating for an Anime
+Calculates and returns the aggregated average score across all user ratings for a specific anime by its AniList ID.
+
+- **Method**: `GET`
+- **Path**: `/tracking/:animeId/average-rating`
+- **Authentication**: None (Public)
+- **Path Parameters**:
+  - `animeId` *(required, positive integer)*: AniList media identifier.
+- **Example Request**:
+  ```http
+  GET /tracking/16498/average-rating
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "animeId": 16498,
+      "averageRating": "91.5000000000000000"
+    }
+  }
+  ```
+- **Note**: `averageRating` returns `null` if no user has provided a rating for this anime yet.
+- **Error Responses**:
+  - `400 Bad Request`: If `animeId` is invalid or not a positive integer:
+    ```json
+    {
+      "status": "fail",
+      "message": "Anime ID must be a positive number"
     }
     ```
 

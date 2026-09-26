@@ -1,0 +1,1 @@
+ALTER TABLE "tracking" RENAME COLUMN "review" TO "reviews";

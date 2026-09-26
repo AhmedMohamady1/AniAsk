@@ -24,6 +24,7 @@ export const trackingTable = pgTable(
         animeId: integer("anime_id").notNull(),
         status: trackingStatus("status").notNull(),
         ratings: integer("ratings"),
+        reviews: text("reviews"),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at")
             .$onUpdate(() => new Date())

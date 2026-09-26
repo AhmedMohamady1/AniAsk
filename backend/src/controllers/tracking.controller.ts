@@ -9,11 +9,17 @@ import CustomError from "../errors/custom.errors";
 import { getAnimeByIds } from "../services/anime.service";
 
 export const createTracking = async (req: Request, res: Response) => {
-    const { animeId, status, ratings } = res.locals.validated.body;
+    const { animeId, status, ratings, reviews } = res.locals.validated.body;
 
     const userId = req.user!.userId;
 
-    const data = await createTrackingEntry(userId, animeId, status, ratings);
+    const data = await createTrackingEntry(
+        userId,
+        animeId,
+        status,
+        ratings,
+        reviews,
+    );
 
     res.status(201).json({
         status: "success",
@@ -43,6 +49,7 @@ export const getTracking = async (req: Request, res: Response) => {
             id: item.id,
             status: item.status,
             ratings: item.ratings,
+            reviews: item.reviews,
             createdAt: item.createdAt,
             updatedAt: item.updatedAt,
         },

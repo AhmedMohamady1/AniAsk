@@ -10,6 +10,7 @@ export async function createTrackingEntry(
     animeId: number,
     status: TrackingStatus,
     ratings?: number,
+    reviews?: string,
 ) {
     const existingTracking = await db
         .select({
@@ -38,6 +39,7 @@ export async function createTrackingEntry(
             animeId,
             status,
             ratings: ratings ?? null,
+            reviews: reviews ?? null,
         })
         .returning();
     return data;
@@ -64,6 +66,7 @@ export async function getUserTracking(
             animeId: trackingTable.animeId,
             status: trackingTable.status,
             ratings: trackingTable.ratings,
+            reviews: trackingTable.reviews,
             createdAt: trackingTable.createdAt,
             updatedAt: trackingTable.updatedAt,
         })
@@ -87,6 +90,7 @@ export async function updateTrackingEntry(
     data: {
         status?: TrackingStatus;
         ratings?: number;
+        reviews?: string;
     },
 ) {
     const [updatedTracking] = await db

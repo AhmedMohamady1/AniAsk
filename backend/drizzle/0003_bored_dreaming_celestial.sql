@@ -1,0 +1,1 @@
+ALTER TABLE "tracking" ADD COLUMN "review" text;

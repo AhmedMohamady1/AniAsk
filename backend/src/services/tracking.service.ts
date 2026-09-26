@@ -1,6 +1,6 @@
-import { trackingTable } from "../db/schema";
+import { trackingTable, usersTable } from "../db/schema";
 import { db } from "../db";
-import { and, count, eq, desc } from "drizzle-orm";
+import { and, count, eq, desc, avg } from "drizzle-orm";
 // import { TrackingStatus } from "../validators/tracking.validator";
 import { TrackingStatus } from "../types/tracking.types";
 import CustomError from "../errors/custom.errors";
@@ -128,4 +128,30 @@ export async function deleteTrackingEntry(userId: string, animeId: number) {
     }
 
     return deletedTracking;
+}
+
+export async function AllUsersReviews(animeId: number) {
+    const data = await db
+        .select({
+            id: trackingTable.id,
+            animeId: trackingTable.animeId,
+            username: usersTable.username,
+            status: trackingTable.status,
+            ratings: trackingTable.ratings,
+            reviews: trackingTable.reviews,
+            createdAt: trackingTable.createdAt,
+            updatedAt: trackingTable.updatedAt,
+        })
+        .from(trackingTable)
+        .leftJoin(usersTable, eq(trackingTable.userId, usersTable.userId))
+        .where(eq(trackingTable.animeId, animeId));
+    return data;
+}
+
+export async function calculateAverageRating(animeId: number) {
+    const [{ average }] = await db
+        .select({ average: avg(trackingTable.ratings) })
+        .from(trackingTable)
+        .where(eq(trackingTable.animeId, animeId));
+    return average;
 }

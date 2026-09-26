@@ -4,6 +4,8 @@ import {
     getTracking,
     updateTracking,
     deleteTracking,
+    getAllUsersReviews,
+    getAverageRating,
 } from "../controllers/tracking.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validation.middleware";
@@ -31,4 +33,15 @@ router.delete(
     deleteTracking,
 );
 
+router.get(
+    "/:animeId/reviews",
+    validate(deleteTrackingSchema),
+    getAllUsersReviews,
+);
+
+router.get(
+    "/:animeId/average-rating",
+    validate(deleteTrackingSchema),
+    getAverageRating,
+);
 export default router;

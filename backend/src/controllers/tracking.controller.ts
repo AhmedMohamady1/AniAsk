@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import {
+    AllUsersReviews,
+    calculateAverageRating,
     createTrackingEntry,
     deleteTrackingEntry,
     getUserTracking,
@@ -97,5 +99,29 @@ export const deleteTracking = async (req: Request, res: Response) => {
     res.status(200).json({
         status: "success",
         message: "Tracking entry deleted successfully",
+    });
+};
+
+export const getAllUsersReviews = async (req: Request, res: Response) => {
+    const { animeId } = res.locals.validated.params;
+
+    const data = await AllUsersReviews(animeId);
+    res.status(200).json({
+        status: "success",
+        data,
+    });
+};
+
+export const getAverageRating = async (req: Request, res: Response) => {
+    const { animeId } = res.locals.validated.params;
+
+    const averageRating = await calculateAverageRating(animeId);
+
+    res.status(200).json({
+        status: "success",
+        data: {
+            animeId,
+            averageRating,
+        },
     });
 };

@@ -11,7 +11,12 @@ import type {
 } from "../types";
 
 const BACKEND_BASE_URL =
-  import.meta.env.VITE_BACKEND_URL || "https://aniask.onrender.com";
+  import.meta.env.VITE_BACKEND_URL !== undefined
+    ? import.meta.env.VITE_BACKEND_URL
+    : import.meta.env.DEV
+    ? ""
+    : "https://aniask.onrender.com";
+
 
 /**
  * Fetch top trending anime.

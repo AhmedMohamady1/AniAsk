@@ -1,3 +1,5 @@
+import { useAuth } from "../context/AuthContext";
+
 interface MyListPageProps {
   onNavigateHome: () => void;
   onNavigateToChat: () => void;
@@ -7,6 +9,8 @@ export default function MyListPage({
   onNavigateHome,
   onNavigateToChat,
 }: MyListPageProps) {
+  const { user, isAuthenticated, openLogin } = useAuth();
+
   return (
     <div className="mylist-view">
       {/* Ambient background glows */}
@@ -21,9 +25,20 @@ export default function MyListPage({
             </span>
           </div>
 
-          <h2 className="mylist-title">My Anime Watchlist</h2>
+          <h2 className="mylist-title">
+            {isAuthenticated && user
+              ? `${user.firstName}'s Anime Watchlist`
+              : "My Anime Watchlist"}
+          </h2>
           <p className="mylist-subtitle">
-            Personal tracking, custom ratings, and reviews are coming soon.
+            {isAuthenticated && user ? (
+              <>
+                Signed in as <strong style={{ color: "var(--color-primary)" }}>@{user.username}</strong>.
+                {" "}Personal anime tracking and custom ratings are coming to your profile soon!
+              </>
+            ) : (
+              "Sign in to sync your personal anime tracking, custom ratings, and reviews across your devices."
+            )}
           </p>
 
           <div className="mylist-feature-preview">
@@ -46,9 +61,22 @@ export default function MyListPage({
           </div>
 
           <div className="mylist-actions">
+            {!isAuthenticated && (
+              <button
+                type="button"
+                className="mylist-btn mylist-btn--primary"
+                onClick={openLogin}
+              >
+                <span className="material-symbols-outlined">login</span>
+                <span>Sign In to Your Account</span>
+              </button>
+            )}
+
             <button
               type="button"
-              className="mylist-btn mylist-btn--primary"
+              className={`mylist-btn ${
+                isAuthenticated ? "mylist-btn--primary" : "mylist-btn--secondary"
+              }`}
               onClick={onNavigateHome}
             >
               <span className="material-symbols-outlined">explore</span>
@@ -69,3 +97,4 @@ export default function MyListPage({
     </div>
   );
 }
+

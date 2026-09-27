@@ -198,3 +198,47 @@ export interface AnimeDetailsResponse {
   message?: string;
 }
 
+/** ── Authentication Types ── */
+
+export interface User {
+  userId: string;
+  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  emailVerified: boolean;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export interface RegisterPayload {
+  username: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface LoginPayload {
+  email?: string;
+  username?: string;
+  password: string;
+}
+
+export interface VerifyEmailPayload {
+  email: string;
+  otp: string;
+}
+
+export interface ResendVerificationPayload {
+  email: string;
+}
+
+export interface AuthResponse {
+  success?: boolean;
+  status?: string;
+  message?: string;
+  accessToken?: string;
+  user?: User;
+}
+

@@ -14,7 +14,6 @@ import {
 } from "../validators/auth.validator";
 import { env } from "../config/configs";
 import { isProd, transformExpirationToDate } from "../utils/auth.utils";
-import { stat } from "fs";
 
 export const register = async (req: Request, res: Response) => {
     const data: RegisterUserInput = req.body;
@@ -35,7 +34,7 @@ export const login = async (req: Request, res: Response) => {
     res.cookie("refresh-token", refreshToken, {
         httpOnly: true,
         secure: isProd,
-        sameSite: "strict",
+        sameSite: "none",
         maxAge: transformExpirationToDate(
             env.REFRESH_TOKEN_EXPIRATION as string,
         ),
@@ -69,7 +68,7 @@ export const logout = async (req: Request, res: Response) => {
         res.clearCookie("refresh-token", {
             httpOnly: true,
             secure: isProd,
-            sameSite: "strict",
+            sameSite: "none",
         });
     }
     res.status(200).json({ success: true, message: "Logged out successfully" });

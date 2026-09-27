@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import AuthModal from "./components/AuthModal";
 import ChatInput from "./components/ChatInput";
 import ChatMessage from "./components/ChatMessage";
 import HomePage from "./components/HomePage";
@@ -143,6 +144,9 @@ export default function App() {
           />
         </div>
       </div>
+
+      {/* Authentication Modal Dialog */}
+      <AuthModal />
     </div>
   );
 }

@@ -34,7 +34,7 @@ export const login = async (req: Request, res: Response) => {
     res.cookie("refresh-token", refreshToken, {
         httpOnly: true,
         secure: isProd,
-        sameSite: "none",
+        sameSite: "lax",
         maxAge: transformExpirationToDate(
             env.REFRESH_TOKEN_EXPIRATION as string,
         ),
@@ -68,7 +68,7 @@ export const logout = async (req: Request, res: Response) => {
         res.clearCookie("refresh-token", {
             httpOnly: true,
             secure: isProd,
-            sameSite: "none",
+            sameSite: "lax",
         });
     }
     res.status(200).json({ success: true, message: "Logged out successfully" });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AuthModal from "./components/AuthModal";
 import ChatInput from "./components/ChatInput";
 import ChatMessage from "./components/ChatMessage";
+import AnimeDetailModal from "./components/AnimeDetailModal";
 import HomePage from "./components/HomePage";
 import MyListPage from "./components/MyListPage";
 import Navbar from "./components/Navbar";
@@ -9,10 +10,12 @@ import Sidebar from "./components/Sidebar";
 import WelcomeScreen from "./components/WelcomeScreen";
 import { useChat } from "./hooks/useChat";
 import { useConversations } from "./hooks/useConversations";
-import type { PageTab } from "./types";
+import type { AnimeMedia, PageTab } from "./types";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<PageTab>("home");
+  // Anime opened from My List's edit button
+  const [myListSelectedAnime, setMyListSelectedAnime] = useState<AnimeMedia | null>(null);
 
   const {
     conversations,
@@ -138,10 +141,22 @@ export default function App() {
           className="tab-panel tab-panel--mylist"
           style={{ display: activeTab === "mylist" ? "block" : "none" }}
         >
-          <MyListPage
+        <MyListPage
             onNavigateHome={() => setActiveTab("home")}
             onNavigateToChat={() => setActiveTab("chatbot")}
+            onOpenAnimeDetail={(anime) => setMyListSelectedAnime(anime)}
           />
+          {/* Detail modal opened from My List edit button */}
+          {myListSelectedAnime && (
+            <AnimeDetailModal
+              anime={myListSelectedAnime}
+              onClose={() => setMyListSelectedAnime(null)}
+              onAskAI={(title) => {
+                setMyListSelectedAnime(null);
+                handleAskAI(title);
+              }}
+            />
+          )}
         </div>
       </div>
 

@@ -242,3 +242,22 @@ export interface AuthResponse {
   user?: User;
 }
 
+/** ── Tracking Types ── */
+
+export type TrackingStatus =
+  | "Watching"
+  | "Completed"
+  | "On Hold"
+  | "Dropped"
+  | "Planning";
+
+/** A single anime tracking entry stored locally. */
+export interface TrackingEntry {
+  animeId: number;
+  status: TrackingStatus;
+  /** Score 1–10 (maps to 10–100 in the DB). null = not rated. */
+  score: number | null;
+  review: string;
+  updatedAt: string; // ISO date string
+}
+

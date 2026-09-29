@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getAnimeDetails } from "../api/anime";
-import type { AnimeDetails, AnimeMedia, AnimeStartDate } from "../types";
+import { useAuth } from "../context/AuthContext";
+import type { AnimeDetails, AnimeMedia, AnimeStartDate, TrackingEntry, TrackingStatus } from "../types";
 
 interface AnimeDetailModalProps {
   anime: AnimeMedia;
@@ -53,6 +54,65 @@ export default function AnimeDetailModal({
 }: AnimeDetailModalProps) {
   const [details, setDetails] = useState<AnimeDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated, openLogin } = useAuth();
+
+  // ── Tracking state ──────────────────────────────────────────────
+  const STORAGE_KEY = `aniask_tracking_${anime.id}`;
+
+  const loadEntry = (): TrackingEntry | null => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as TrackingEntry) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const [trackStatus, setTrackStatus] = useState<TrackingStatus | null>(
+    () => loadEntry()?.status ?? null
+  );
+  const [trackScore, setTrackScore] = useState<number | null>(
+    () => loadEntry()?.score ?? null
+  );
+  const [trackReview, setTrackReview] = useState<string>(
+    () => loadEntry()?.review ?? ""
+  );
+  const [hoverStar, setHoverStar] = useState<number | null>(null);
+  const [savedFeedback, setSavedFeedback] = useState(false);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSave = () => {
+    if (!trackStatus) return;
+    const entry: TrackingEntry = {
+      animeId: anime.id,
+      status: trackStatus,
+      score: trackScore,
+      review: trackReview.trim(),
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entry));
+    window.dispatchEvent(new CustomEvent("aniask:tracking-updated"));
+    setSavedFeedback(true);
+    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = setTimeout(() => setSavedFeedback(false), 2500);
+  };
+
+  const handleRemove = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    window.dispatchEvent(new CustomEvent("aniask:tracking-updated"));
+    setTrackStatus(null);
+    setTrackScore(null);
+    setTrackReview("");
+    setSavedFeedback(false);
+  };
+
+  // Clean up feedback timer on unmount
+  useEffect(() => {
+    return () => {
+      if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    };
+  }, []);
+  // ───────────────────────────────────────────────────────────────
 
   // Fetch complete details on mount
   useEffect(() => {
@@ -466,6 +526,154 @@ export default function AnimeDetailModal({
               </div>
             </div>
           )}
+
+          {/* ── Your Tracking Section ── */}
+          <div className="anime-modal-tracking-section">
+            <div className="tracking-section-header">
+              <span className="material-symbols-outlined">bookmark_added</span>
+              <h3>Your Tracking</h3>
+            </div>
+
+            {!isAuthenticated ? (
+              /* Login prompt for guests */
+              <div className="tracking-login-prompt">
+                <span className="material-symbols-outlined">lock</span>
+                <span>
+                  <button
+                    type="button"
+                    className="tracking-login-link"
+                    onClick={openLogin}
+                  >
+                    Sign in
+                  </button>{" "}
+                  to track this anime, rate it, and write a review.
+                </span>
+              </div>
+            ) : (
+              <>
+                {/* Status row */}
+                <div className="tracking-row">
+                  <span className="tracking-row-label">Status</span>
+                  <div className="tracking-status-pills">
+                    {(
+                      [
+                        { value: "Watching", icon: "play_circle" },
+                        { value: "Completed", icon: "check_circle" },
+                        { value: "On Hold", icon: "pause_circle" },
+                        { value: "Dropped", icon: "cancel" },
+                        { value: "Planning", icon: "bookmark" },
+                      ] as { value: TrackingStatus; icon: string }[]
+                    ).map(({ value, icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`tracking-status-btn${trackStatus === value ? " tracking-status-btn--active" : ""}`}
+                        onClick={() =>
+                          setTrackStatus(trackStatus === value ? null : value)
+                        }
+                      >
+                        <span className="material-symbols-outlined">{icon}</span>
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Score row */}
+                <div className="tracking-row">
+                  <span className="tracking-row-label">Score</span>
+                  <div className="tracking-stars">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => {
+                      const filled =
+                        hoverStar !== null
+                          ? star <= hoverStar
+                          : trackScore !== null && star <= trackScore;
+                      const isHovered =
+                        hoverStar !== null && star <= hoverStar;
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          className={`tracking-star-btn${filled ? (isHovered ? " tracking-star-btn--hovered" : " tracking-star-btn--filled") : ""}`}
+                          onMouseEnter={() => setHoverStar(star)}
+                          onMouseLeave={() => setHoverStar(null)}
+                          onClick={() =>
+                            setTrackScore(trackScore === star ? null : star)
+                          }
+                          title={`${star}/10`}
+                        >
+                          ★
+                        </button>
+                      );
+                    })}
+                    <span
+                      className={`tracking-score-display${trackScore !== null ? " tracking-score-display--rated" : ""}`}
+                    >
+                      {hoverStar !== null
+                        ? `${hoverStar}/10`
+                        : trackScore !== null
+                        ? `${trackScore}/10`
+                        : "—"}
+                    </span>
+                    {trackScore !== null && (
+                      <button
+                        type="button"
+                        className="tracking-clear-score"
+                        onClick={() => setTrackScore(null)}
+                        title="Clear score"
+                      >
+                        ✕ clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Review row */}
+                <div className="tracking-row">
+                  <span className="tracking-row-label">Review</span>
+                  <div className="tracking-review-wrap">
+                    <textarea
+                      className="tracking-review-textarea"
+                      placeholder="Write your thoughts about this anime…"
+                      value={trackReview}
+                      onChange={(e) => setTrackReview(e.target.value)}
+                      maxLength={2000}
+                    />
+                  </div>
+                </div>
+
+                {/* Save / Remove row */}
+                <div className="tracking-save-row">
+                  {savedFeedback && (
+                    <span className="tracking-save-feedback">
+                      <span className="material-symbols-outlined">check_circle</span>
+                      Saved!
+                    </span>
+                  )}
+                  {loadEntry() && (
+                    <button
+                      type="button"
+                      className="tracking-remove-btn"
+                      onClick={handleRemove}
+                    >
+                      <span className="material-symbols-outlined">delete</span>
+                      Remove
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="tracking-save-btn"
+                    onClick={handleSave}
+                    disabled={!trackStatus}
+                    title={!trackStatus ? "Select a status first" : "Save tracking"}
+                  >
+                    <span className="material-symbols-outlined">save</span>
+                    Save
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Action Buttons */}
           <div className="anime-modal-actions-bar">

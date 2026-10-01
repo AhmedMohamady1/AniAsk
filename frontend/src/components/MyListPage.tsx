@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getAnimeDetails } from "../api/anime";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { getUserTrackingApi, type TrackingListItem } from "../api/tracking";
 import { useAuth } from "../context/AuthContext";
-import type { AnimeMedia, TrackingEntry, TrackingStatus } from "../types";
+import type { AnimeMedia, TrackingStatus } from "../types";
+import {
+  TRACKING_STATUS_COLORS,
+  TRACKING_STATUS_ICONS,
+  TRACKING_STATUS_LABELS,
+  ratingToScore,
+} from "../types";
 
 interface MyListPageProps {
   onNavigateHome: () => void;
@@ -9,46 +15,14 @@ interface MyListPageProps {
   onOpenAnimeDetail?: (anime: AnimeMedia) => void;
 }
 
-/** Read all aniask_tracking_* entries from localStorage */
-function loadAllEntries(): TrackingEntry[] {
-  const entries: TrackingEntry[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith("aniask_tracking_")) continue;
-    try {
-      const parsed = JSON.parse(localStorage.getItem(key) ?? "");
-      if (parsed?.animeId && parsed?.status) entries.push(parsed as TrackingEntry);
-    } catch { /* skip malformed */ }
-  }
-  return entries.sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  );
-}
-
 const STATUS_TABS: { label: string; value: TrackingStatus | "All" }[] = [
   { label: "All",       value: "All"       },
-  { label: "Watching",  value: "Watching"  },
-  { label: "Completed", value: "Completed" },
-  { label: "On Hold",   value: "On Hold"   },
-  { label: "Dropped",   value: "Dropped"   },
-  { label: "Planning",  value: "Planning"  },
+  { label: "Watching",  value: "watching"  },
+  { label: "Completed", value: "completed" },
+  { label: "On Hold",   value: "on_hold"   },
+  { label: "Dropped",   value: "dropped"   },
+  { label: "Planning",  value: "planning"  },
 ];
-
-const STATUS_ICONS: Record<TrackingStatus, string> = {
-  Watching:  "play_circle",
-  Completed: "check_circle",
-  "On Hold": "pause_circle",
-  Dropped:   "cancel",
-  Planning:  "bookmark",
-};
-
-const STATUS_COLORS: Record<TrackingStatus, string> = {
-  Watching:  "mylist-status--watching",
-  Completed: "mylist-status--completed",
-  "On Hold": "mylist-status--onhold",
-  Dropped:   "mylist-status--dropped",
-  Planning:  "mylist-status--planning",
-};
 
 function formatDate(iso: string): string {
   try {
@@ -58,71 +32,50 @@ function formatDate(iso: string): string {
   } catch { return "—"; }
 }
 
-/** Separate anime metadata cache from tracking entries */
-type AnimeCache = Record<number, { anime: AnimeMedia | null; loading: boolean }>;
-
 export default function MyListPage({
   onNavigateHome,
   onNavigateToChat,
   onOpenAnimeDetail,
 }: MyListPageProps) {
-  const { user, isAuthenticated, openLogin } = useAuth();
+  const { user, isAuthenticated, accessToken, openLogin } = useAuth();
 
-  const [entries, setEntries]       = useState<TrackingEntry[]>(loadAllEntries);
-  const [animeCache, setAnimeCache] = useState<AnimeCache>({});
-  const [activeTab, setActiveTab]   = useState<TrackingStatus | "All">("All");
+  const [items, setItems]     = useState<TrackingListItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TrackingStatus | "All">("All");
 
-  // Keep a ref to current cache so the event handler can read fresh state
-  const animeCacheRef = useRef<AnimeCache>({});
-  animeCacheRef.current = animeCache;
+  const fetchList = useCallback(async () => {
+    if (!accessToken) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await getUserTrackingApi({ perPage: 50 }, accessToken);
+      setItems(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load your list.");
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
 
-  /** Fetch metadata for any IDs not yet in cache */
-  const fetchMissing = useCallback((ids: number[]) => {
-    ids.forEach((id) => {
-      if (animeCacheRef.current[id]) return; // already cached
-      setAnimeCache((prev) => ({ ...prev, [id]: { anime: null, loading: true } }));
-      getAnimeDetails(id)
-        .then((details) =>
-          setAnimeCache((prev) => ({
-            ...prev,
-            [id]: { anime: details as AnimeMedia, loading: false },
-          }))
-        )
-        .catch(() =>
-          setAnimeCache((prev) => ({
-            ...prev,
-            [id]: { anime: null, loading: false },
-          }))
-        );
-    });
-  }, []);
-
-  /** Re-read localStorage and update entries; fetch new IDs */
-  const refresh = useCallback(() => {
-    const fresh = loadAllEntries();
-    setEntries(fresh);
-    fetchMissing(fresh.map((e) => e.animeId));
-  }, [fetchMissing]);
-
-  // Initial load
+  // Initial fetch
   useEffect(() => {
-    fetchMissing(entries.map((e) => e.animeId));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (isAuthenticated) fetchList();
+  }, [isAuthenticated, fetchList]);
 
-  // Listen for tracking changes (from modal save/remove or card quick actions)
+  // Re-fetch when tracking changes (modal save/remove/card quick-action)
   useEffect(() => {
-    window.addEventListener("aniask:tracking-updated", refresh);
-    return () => window.removeEventListener("aniask:tracking-updated", refresh);
-  }, [refresh]);
+    window.addEventListener("aniask:tracking-updated", fetchList);
+    return () => window.removeEventListener("aniask:tracking-updated", fetchList);
+  }, [fetchList]);
 
   const filtered = useMemo(
-    () => entries.filter((e) => activeTab === "All" || e.status === activeTab),
-    [entries, activeTab]
+    () => items.filter((item) => activeTab === "All" || item.tracking.status === activeTab),
+    [items, activeTab]
   );
 
   const tabCount = (tab: TrackingStatus | "All") =>
-    tab === "All" ? entries.length : entries.filter((e) => e.status === tab).length;
+    tab === "All" ? items.length : items.filter((i) => i.tracking.status === tab).length;
 
   // ── Unauthenticated ──────────────────────────────────────────────
   if (!isAuthenticated) {
@@ -163,8 +116,42 @@ export default function MyListPage({
     );
   }
 
+  // ── Authenticated — loading ──────────────────────────────────────
+  if (loading && items.length === 0) {
+    return (
+      <div className="mylist-view">
+        <div className="mylist-container">
+          <div className="mylist-empty-card">
+            <span className="material-symbols-outlined spinner-icon" style={{ fontSize: "2.5rem", color: "var(--color-primary)" }}>
+              progress_activity
+            </span>
+            <p style={{ color: "var(--color-text-muted)", marginTop: "1rem" }}>Loading your list…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Authenticated — error ────────────────────────────────────────
+  if (error) {
+    return (
+      <div className="mylist-view">
+        <div className="mylist-container">
+          <div className="mylist-empty-card">
+            <span className="material-symbols-outlined" style={{ fontSize: "2.5rem", color: "var(--color-error)" }}>error</span>
+            <p style={{ color: "var(--color-error)", marginTop: "1rem" }}>{error}</p>
+            <button type="button" className="mylist-btn mylist-btn--primary" onClick={fetchList} style={{ marginTop: "1rem" }}>
+              <span className="material-symbols-outlined">refresh</span>
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Authenticated — empty ────────────────────────────────────────
-  if (entries.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="mylist-view">
         <div className="welcome-glow welcome-glow-primary" />
@@ -206,7 +193,7 @@ export default function MyListPage({
             <span className="material-symbols-outlined mylist-full-icon">bookmark_added</span>
             <div>
               <h1 className="mylist-full-title">{user?.firstName}&apos;s Anime List</h1>
-              <p className="mylist-full-subtitle">{entries.length} anime tracked</p>
+              <p className="mylist-full-subtitle">{items.length} anime tracked</p>
             </div>
           </div>
           <button type="button" className="mylist-btn mylist-btn--secondary mylist-discover-btn" onClick={onNavigateHome}>
@@ -256,29 +243,40 @@ export default function MyListPage({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((entry) => {
-                const cached  = animeCache[entry.animeId];
-                const anime   = cached?.anime ?? null;
-                const isLoading = cached?.loading ?? true;
+              {filtered.map((item) => {
+                const { anime, tracking } = item;
+                const status = tracking.status;
+                const starScore = ratingToScore(tracking.ratings);
 
                 const title =
                   anime?.title?.english ||
                   anime?.title?.romaji  ||
                   anime?.title?.native  ||
-                  `Anime #${entry.animeId}`;
+                  `Anime #${tracking.id}`;
 
                 const coverUrl =
-                  anime?.coverImage?.large ??
                   anime?.coverImage?.extraLarge ??
+                  anime?.coverImage?.large ??
                   null;
 
+                // Build AnimeMedia shape for the edit button
+                const animeMedia: AnimeMedia | null = anime
+                  ? {
+                      id: anime.id,
+                      title: anime.title,
+                      coverImage: anime.coverImage ?? undefined,
+                      averageScore: anime.averageScore ?? undefined,
+                      episodes: anime.episodes ?? undefined,
+                      format: anime.format ?? undefined,
+                      status: anime.status ?? undefined,
+                    }
+                  : null;
+
                 return (
-                  <tr key={entry.animeId} className="mylist-row">
+                  <tr key={tracking.id} className="mylist-row">
                     {/* Cover */}
                     <td className="mylist-td mylist-td--cover">
-                      {isLoading ? (
-                        <div className="mylist-cover-skeleton" />
-                      ) : coverUrl ? (
+                      {coverUrl ? (
                         <img src={coverUrl} alt={title} className="mylist-cover-img" loading="lazy" />
                       ) : (
                         <div className="mylist-cover-placeholder">
@@ -289,27 +287,23 @@ export default function MyListPage({
 
                     {/* Title */}
                     <td className="mylist-td mylist-td--title">
-                      {isLoading ? (
-                        <div className="mylist-skeleton-line mylist-skeleton-title" />
-                      ) : (
-                        <span className="mylist-title-text" title={title}>{title}</span>
-                      )}
+                      <span className="mylist-title-text" title={title}>{title}</span>
                     </td>
 
                     {/* Status */}
                     <td className="mylist-td mylist-td--status">
-                      <span className={`mylist-status-badge ${STATUS_COLORS[entry.status]}`}>
-                        <span className="material-symbols-outlined">{STATUS_ICONS[entry.status]}</span>
-                        {entry.status}
+                      <span className={`mylist-status-badge mylist-status--${TRACKING_STATUS_COLORS[status]}`}>
+                        <span className="material-symbols-outlined">{TRACKING_STATUS_ICONS[status]}</span>
+                        {TRACKING_STATUS_LABELS[status]}
                       </span>
                     </td>
 
                     {/* Score */}
                     <td className="mylist-td mylist-td--score">
-                      {entry.score !== null ? (
+                      {starScore !== null ? (
                         <span className="mylist-score">
                           <span className="mylist-score-star">★</span>
-                          {entry.score}
+                          {starScore}
                           <span className="mylist-score-max">/10</span>
                         </span>
                       ) : (
@@ -319,9 +313,11 @@ export default function MyListPage({
 
                     {/* Review snippet */}
                     <td className="mylist-td mylist-td--review">
-                      {entry.review ? (
-                        <span className="mylist-review-snippet" title={entry.review}>
-                          {entry.review.length > 60 ? entry.review.slice(0, 60) + "…" : entry.review}
+                      {tracking.reviews ? (
+                        <span className="mylist-review-snippet" title={tracking.reviews}>
+                          {tracking.reviews.length > 60
+                            ? tracking.reviews.slice(0, 60) + "…"
+                            : tracking.reviews}
                         </span>
                       ) : (
                         <span className="mylist-review-none">No review</span>
@@ -330,16 +326,16 @@ export default function MyListPage({
 
                     {/* Date */}
                     <td className="mylist-td mylist-td--date">
-                      <span className="mylist-date">{formatDate(entry.updatedAt)}</span>
+                      <span className="mylist-date">{formatDate(tracking.updatedAt)}</span>
                     </td>
 
                     {/* Edit */}
                     <td className="mylist-td mylist-td--edit">
-                      {anime && onOpenAnimeDetail && (
+                      {animeMedia && onOpenAnimeDetail && (
                         <button
                           type="button"
                           className="mylist-edit-btn"
-                          onClick={() => onOpenAnimeDetail(anime)}
+                          onClick={() => onOpenAnimeDetail(animeMedia)}
                           title="Edit tracking"
                         >
                           <span className="material-symbols-outlined">edit</span>

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { upsertTrackingApi } from "../api/tracking";
 import { useAuth } from "../context/AuthContext";
 import type { AnimeMedia, TrackingEntry, TrackingStatus } from "../types";
+import {
+  TRACKING_STATUS_ICONS,
+  TRACKING_STATUS_LABELS,
+  scoreToRating,
+} from "../types";
 
 interface AnimeCardProps {
   anime: AnimeMedia;
@@ -8,20 +14,14 @@ interface AnimeCardProps {
   onClick?: () => void;
 }
 
-const STATUSES: { value: TrackingStatus; icon: string }[] = [
-  { value: "Watching",  icon: "play_circle"  },
-  { value: "Completed", icon: "check_circle" },
-  { value: "On Hold",   icon: "pause_circle" },
-  { value: "Dropped",   icon: "cancel"       },
-  { value: "Planning",  icon: "bookmark"     },
-];
+const STATUSES: TrackingStatus[] = ["watching", "completed", "on_hold", "dropped", "planning"];
 
 const STATUS_COLOR_CLASS: Record<TrackingStatus, string> = {
-  Watching:  "card-track-badge--watching",
-  Completed: "card-track-badge--completed",
-  "On Hold": "card-track-badge--onhold",
-  Dropped:   "card-track-badge--dropped",
-  Planning:  "card-track-badge--planning",
+  watching:  "card-track-badge--watching",
+  completed: "card-track-badge--completed",
+  on_hold:   "card-track-badge--onhold",
+  dropped:   "card-track-badge--dropped",
+  planning:  "card-track-badge--planning",
 };
 
 function readStatus(animeId: number): TrackingStatus | null {
@@ -93,7 +93,7 @@ export default function AnimeCard({ anime, rank, onClick }: AnimeCardProps) {
   // Cleanup feedback timer
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
-  const saveStatus = (status: TrackingStatus, e: React.MouseEvent) => {
+  const saveStatus = async (status: TrackingStatus, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isAuthenticated) { openLogin(); return; }
 
@@ -111,13 +111,28 @@ export default function AnimeCard({ anime, rank, onClick }: AnimeCardProps) {
       review:    existing?.review ?? "",
       updatedAt: new Date().toISOString(),
     };
-    localStorage.setItem(`aniask_tracking_${anime.id}`, JSON.stringify(entry));
+
+    // Optimistic UI update
     setCurrentStatus(status);
     setPopoverOpen(false);
     setJustSaved(status);
+    localStorage.setItem(`aniask_tracking_${anime.id}`, JSON.stringify(entry));
     window.dispatchEvent(new CustomEvent("aniask:tracking-updated"));
     if (savedTimer.current) clearTimeout(savedTimer.current);
     savedTimer.current = setTimeout(() => setJustSaved(null), 1600);
+
+    // Persist to backend (non-blocking)
+    if (accessToken) {
+      upsertTrackingApi(
+        {
+          animeId: anime.id,
+          status,
+          ratings: scoreToRating(entry.score),
+          reviews: entry.review || undefined,
+        },
+        accessToken
+      ).catch(console.warn);
+    }
   };
 
   return (
@@ -165,7 +180,7 @@ export default function AnimeCard({ anime, rank, onClick }: AnimeCardProps) {
         {currentStatus && !justSaved && (
           <div className={`card-track-badge ${STATUS_COLOR_CLASS[currentStatus]}`}>
             <span className="material-symbols-outlined">
-              {STATUSES.find((s) => s.value === currentStatus)?.icon}
+              {TRACKING_STATUS_ICONS[currentStatus]}
             </span>
           </div>
         )}
@@ -186,9 +201,9 @@ export default function AnimeCard({ anime, rank, onClick }: AnimeCardProps) {
           {/* Plan to Watch — one-tap shortcut */}
           <button
             type="button"
-            className={`card-qa-btn${currentStatus === "Planning" ? " card-qa-btn--active" : ""}`}
+            className={`card-qa-btn${currentStatus === "planning" ? " card-qa-btn--active" : ""}`}
             title="Add to Plan to Watch"
-            onClick={(e) => saveStatus("Planning", e)}
+            onClick={(e) => saveStatus("planning", e)}
           >
             <span className="material-symbols-outlined">bookmark</span>
             <span>Plan</span>
@@ -197,30 +212,30 @@ export default function AnimeCard({ anime, rank, onClick }: AnimeCardProps) {
           {/* Status picker — opens a small popover */}
           <button
             type="button"
-            className={`card-qa-btn${currentStatus && currentStatus !== "Planning" ? " card-qa-btn--active" : ""}${popoverOpen ? " card-qa-btn--open" : ""}`}
+            className={`card-qa-btn${currentStatus && currentStatus !== "planning" ? " card-qa-btn--active" : ""}${popoverOpen ? " card-qa-btn--open" : ""}`}
             title="Set watch status"
             onClick={(e) => { e.stopPropagation(); setPopoverOpen((o) => !o); }}
           >
             <span className="material-symbols-outlined">
-              {currentStatus && currentStatus !== "Planning"
-                ? STATUSES.find((s) => s.value === currentStatus)?.icon ?? "playlist_add_check"
+              {currentStatus && currentStatus !== "planning"
+                ? TRACKING_STATUS_ICONS[currentStatus]
                 : "playlist_add_check"}
             </span>
-            <span>{currentStatus && currentStatus !== "Planning" ? currentStatus : "Status"}</span>
+            <span>{currentStatus && currentStatus !== "planning" ? TRACKING_STATUS_LABELS[currentStatus] : "Status"}</span>
           </button>
 
           {/* Status popover */}
           {popoverOpen && (
             <div className="card-status-popover">
-              {STATUSES.map(({ value, icon }) => (
+              {STATUSES.map((value) => (
                 <button
                   key={value}
                   type="button"
                   className={`card-status-option${currentStatus === value ? " card-status-option--active" : ""}`}
                   onClick={(e) => saveStatus(value, e)}
                 >
-                  <span className="material-symbols-outlined">{icon}</span>
-                  {value}
+                  <span className="material-symbols-outlined">{TRACKING_STATUS_ICONS[value]}</span>
+                  {TRACKING_STATUS_LABELS[value]}
                 </button>
               ))}
             </div>

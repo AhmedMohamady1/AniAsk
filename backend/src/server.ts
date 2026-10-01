@@ -1,3 +1,5 @@
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger";
 import express, { Response, Request } from "express";
 import cors from "cors";
 import morgan from "morgan";
@@ -29,6 +31,8 @@ app.use(
 );
 app.use(cookieParser());
 
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 app.get("/health", (req: Request, res: Response) => {
     res.status(200).json({
         status: "Ok",
@@ -58,6 +62,9 @@ app.use("/tracking", trackingRouter);
 app.use(errorHandlerMiddleware);
 
 app.listen(PORT, () => {
-    console.log(`Server is running at http://localhost:${PORT}`);
-    console.log("Api Health: ", "http://localhost:4000/health");
+    if (env.NODE_ENV === "development") {
+        console.log(`Server is running at http://localhost:${PORT}`);
+        console.log("Api Health: ", "http://localhost:4000/health");
+        console.log("Api Documentation: ", "http://localhost:4000/docs");
+    }
 });

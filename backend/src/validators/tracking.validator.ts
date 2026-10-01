@@ -80,3 +80,15 @@ export const deleteTrackingSchema = z.object({
 });
 
 // export type TrackingStatus = z.infer<typeof trackingSchema>["body"]["status"];
+
+export const animeTrackingParamSchema = z.object({
+    params: z.object({
+        animeId: z.coerce
+            .number()
+            .int()
+            .positive("Anime ID must be a positive number"),
+    }),
+
+    query: z.object({}).default({}),
+    body: z.object({}).default({}),
+});

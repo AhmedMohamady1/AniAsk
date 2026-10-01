@@ -242,3 +242,69 @@ export interface AuthResponse {
   user?: User;
 }
 
+/** ── Tracking Types ── */
+
+/** Backend snake_case format — matches Neon DB enum exactly. */
+export type TrackingStatus =
+  | "watching"
+  | "completed"
+  | "on_hold"
+  | "dropped"
+  | "planning";
+
+/** Human-readable labels for each status. */
+export const TRACKING_STATUS_LABELS: Record<TrackingStatus, string> = {
+  watching:  "Watching",
+  completed: "Completed",
+  on_hold:   "On Hold",
+  dropped:   "Dropped",
+  planning:  "Planning",
+};
+
+/** Material icon for each status. */
+export const TRACKING_STATUS_ICONS: Record<TrackingStatus, string> = {
+  watching:  "play_circle",
+  completed: "check_circle",
+  on_hold:   "pause_circle",
+  dropped:   "cancel",
+  planning:  "bookmark",
+};
+
+/** CSS class suffix for each status badge color. */
+export const TRACKING_STATUS_COLORS: Record<TrackingStatus, string> = {
+  watching:  "watching",
+  completed: "completed",
+  on_hold:   "onhold",
+  dropped:   "dropped",
+  planning:  "planning",
+};
+
+/**
+ * A single anime tracking entry — stored in localStorage as a local cache
+ * and synced with the backend on every save/remove.
+ */
+export interface TrackingEntry {
+  animeId: number;
+  status: TrackingStatus;
+  /**
+   * Score as displayed in UI: 1–10 (stars).
+   * Sent to backend as ratings = score * 10  (0–100 scale).
+   * null = not rated.
+   */
+  score: number | null;
+  review: string;
+  updatedAt: string; // ISO date string
+}
+
+/** Convert 1–10 star score → 0–100 backend rating. */
+export function scoreToRating(score: number | null): number | undefined {
+  return score !== null && score !== undefined ? score * 10 : undefined;
+}
+
+/** Convert 0–100 backend rating → 1–10 star score. */
+export function ratingToScore(rating: number | null | undefined): number | null {
+  if (rating === null || rating === undefined) return null;
+  return Math.round(rating / 10);
+}
+
+
